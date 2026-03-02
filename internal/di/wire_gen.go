@@ -7,19 +7,29 @@
 package di
 
 import (
+	"github.com/dysodeng/ai-adp/internal/application/tenant/service"
 	"github.com/dysodeng/ai-adp/internal/infrastructure/config"
+	"github.com/dysodeng/ai-adp/internal/infrastructure/persistence"
+	"github.com/dysodeng/ai-adp/internal/infrastructure/persistence/repository/tenant"
 	"github.com/dysodeng/ai-adp/internal/infrastructure/server"
+	"github.com/dysodeng/ai-adp/internal/interfaces/http/handler"
 )
 
 // Injectors from wire.go:
 
-// InitApp is the Wire injector. Wire generates wire_gen.go from this.
 func InitApp(configPath string) (*App, error) {
 	configConfig, err := config.Load(configPath)
 	if err != nil {
 		return nil, err
 	}
-	httpServer := server.NewHTTPServer(configConfig)
+	db, err := persistence.NewDB(configConfig)
+	if err != nil {
+		return nil, err
+	}
+	tenantRepositoryImpl := tenant.NewTenantRepository(db)
+	tenantAppService := service.NewTenantAppService(tenantRepositoryImpl)
+	tenantHandler := handler.NewTenantHandler(tenantAppService)
+	httpServer := server.NewHTTPServer(configConfig, tenantHandler)
 	app := NewApp(httpServer)
 	return app, nil
 }

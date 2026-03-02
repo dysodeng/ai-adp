@@ -9,6 +9,14 @@ import (
 	domainrepo "github.com/dysodeng/ai-adp/internal/domain/tenant/repository"
 )
 
+// TenantService defines the tenant use case interface (used for mocking in tests)
+type TenantService interface {
+	Create(ctx context.Context, cmd dto.CreateTenantCommand) (*dto.TenantResult, error)
+	GetByID(ctx context.Context, id string) (*dto.TenantResult, error)
+	List(ctx context.Context, q dto.ListTenantsQuery) (*dto.TenantListResult, error)
+	Delete(ctx context.Context, id string) error
+}
+
 // TenantAppService handles tenant use cases
 type TenantAppService struct {
 	tenantRepo domainrepo.TenantRepository

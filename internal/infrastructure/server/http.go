@@ -18,10 +18,13 @@ type HTTPServer struct {
 	server *http.Server
 }
 
-func NewHTTPServer(cfg *config.Config) *HTTPServer {
+func NewHTTPServer(cfg *config.Config, tenantHandler *handler.TenantHandler) *HTTPServer {
 	r := gin.New()
 	r.Use(middleware.Recovery(), middleware.RequestID())
 	r.GET("/health", handler.HealthCheck)
+
+	v1 := r.Group("/api/v1")
+	tenantHandler.RegisterRoutes(v1)
 
 	return &HTTPServer{
 		engine: r,
