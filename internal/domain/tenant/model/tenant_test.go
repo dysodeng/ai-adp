@@ -15,8 +15,7 @@ func TestNewTenant_Valid(t *testing.T) {
 	assert.Equal(t, "Acme Corp", tenant.Name())
 	assert.Equal(t, "admin@acme.com", tenant.Email())
 	assert.Equal(t, valueobject.StatusActive, tenant.Status())
-	// ID is assigned by persistence layer (BeforeCreate hook); uuid.Nil expected here
-	assert.Equal(t, uuid.Nil, tenant.ID())
+	assert.NotEqual(t, uuid.Nil, tenant.ID())
 }
 
 func TestNewTenant_EmptyName(t *testing.T) {

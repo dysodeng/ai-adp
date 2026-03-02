@@ -3,13 +3,13 @@ package model
 import (
 	"fmt"
 
-	"github.com/google/uuid"
 	"github.com/dysodeng/ai-adp/internal/domain/tenant/valueobject"
+	"github.com/google/uuid"
 )
 
 // Tenant 租户聚合根
 type Tenant struct {
-	id     string
+	id     uuid.UUID
 	name   string
 	email  string
 	status valueobject.TenantStatus
@@ -28,7 +28,7 @@ func NewTenant(name, email string) (*Tenant, error) {
 		return nil, fmt.Errorf("failed to generate tenant ID: %w", err)
 	}
 	return &Tenant{
-		id:     id.String(),
+		id:     id,
 		name:   name,
 		email:  email,
 		status: valueobject.StatusActive,
@@ -36,11 +36,11 @@ func NewTenant(name, email string) (*Tenant, error) {
 }
 
 // Reconstitute rebuilds a Tenant from persistence (no new ID generated)
-func Reconstitute(id, name, email string, status valueobject.TenantStatus) *Tenant {
+func Reconstitute(id uuid.UUID, name, email string, status valueobject.TenantStatus) *Tenant {
 	return &Tenant{id: id, name: name, email: email, status: status}
 }
 
-func (t *Tenant) ID() string                       { return t.id }
+func (t *Tenant) ID() uuid.UUID                    { return t.id }
 func (t *Tenant) Name() string                     { return t.name }
 func (t *Tenant) Email() string                    { return t.email }
 func (t *Tenant) Status() valueobject.TenantStatus { return t.status }

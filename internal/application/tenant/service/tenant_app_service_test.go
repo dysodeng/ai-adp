@@ -35,8 +35,7 @@ func TestTenantAppService_Create(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "Acme Corp", result.Name)
 	assert.Equal(t, "active", result.Status)
-	// ID is assigned by the persistence layer; uuid.Nil expected before actual DB save
-	_ = result.ID
+	assert.NotEqual(t, uuid.Nil, result.ID)
 }
 
 func TestTenantAppService_Create_EmptyName(t *testing.T) {
