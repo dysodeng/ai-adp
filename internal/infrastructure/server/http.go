@@ -1,0 +1,56 @@
+package server
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"net/http"
+	"time"
+
+	"github.com/gin-gonic/gin"
+	"github.com/dysodeng/ai-adp/internal/infrastructure/config"
+	"github.com/dysodeng/ai-adp/internal/interfaces/http/handler"
+	"github.com/dysodeng/ai-adp/internal/interfaces/http/middleware"
+)
+
+type HTTPServer struct {
+	engine *gin.Engine
+	server *http.Server
+}
+
+func NewHTTPServer(cfg *config.Config) *HTTPServer {
+	r := gin.New()
+	r.Use(middleware.Recovery(), middleware.RequestID())
+	r.GET("/health", handler.HealthCheck)
+
+	return &HTTPServer{
+		engine: r,
+		server: &http.Server{
+			Addr:         fmt.Sprintf(":%d", cfg.App.Port),
+			Handler:      r,
+			ReadTimeout:  30 * time.Second,
+			WriteTimeout: 60 * time.Second,
+		},
+	}
+}
+
+func (s *HTTPServer) Start() error {
+	return s.server.ListenAndServe()
+}
+
+func (s *HTTPServer) Shutdown(ctx context.Context) error {
+	return s.server.Shutdown(ctx)
+}
+
+// Engine returns the underlying gin.Engine for route registration by modules
+func (s *HTTPServer) Engine() *gin.Engine {
+	return s.engine
+}
+
+// ErrServerClosed re-exports http.ErrServerClosed for callers
+var ErrServerClosed = http.ErrServerClosed
+
+// IsErrServerClosed checks if an error is http.ErrServerClosed
+func IsErrServerClosed(err error) bool {
+	return errors.Is(err, http.ErrServerClosed)
+}
