@@ -27,3 +27,8 @@ go.work.sum
 
 # ide
 .idea
+
+bin/
+var/logs/*.log
+*.env
+.DS_Store
