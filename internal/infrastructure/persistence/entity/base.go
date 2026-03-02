@@ -9,7 +9,7 @@ import (
 
 // Base 所有 GORM 实体的基类，主键使用 UUID v7
 type Base struct {
-	ID        uuid.UUID `gorm:"type:uuid;not null;primaryKey"`
+	ID        uuid.UUID `gorm:"type:uuid;not null;default:uuid_generate_v7();primaryKey"`
 	CreatedAt time.Time `gorm:"autoCreateTime;index:idx_created"`
 	UpdatedAt time.Time `gorm:"autoUpdateTime"`
 }
