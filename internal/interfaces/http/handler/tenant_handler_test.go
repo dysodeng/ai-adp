@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
 	"github.com/dysodeng/ai-adp/internal/application/tenant/dto"
@@ -20,10 +21,12 @@ func TestTenantHandler_Create(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
+	testID := uuid.MustParse("01234567-89ab-cdef-0123-456789abcdef")
+
 	mockSvc := mocksvc.NewMockTenantService(ctrl)
 	mockSvc.EXPECT().
 		Create(gomock.Any(), gomock.Any()).
-		Return(&dto.TenantResult{ID: "uuid-001", Name: "Acme", Email: "admin@acme.com", Status: "active"}, nil).
+		Return(&dto.TenantResult{ID: testID, Name: "Acme", Email: "admin@acme.com", Status: "active"}, nil).
 		Times(1)
 
 	h := handler.NewTenantHandler(mockSvc)
@@ -37,7 +40,7 @@ func TestTenantHandler_Create(t *testing.T) {
 	r.ServeHTTP(w, req)
 
 	assert.Equal(t, http.StatusCreated, w.Code)
-	assert.Contains(t, w.Body.String(), "uuid-001")
+	assert.Contains(t, w.Body.String(), testID.String())
 }
 
 func TestTenantHandler_GetByID(t *testing.T) {
@@ -45,10 +48,13 @@ func TestTenantHandler_GetByID(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
+	testID := uuid.MustParse("01234567-89ab-cdef-0123-456789abcdef")
+	testIDStr := testID.String()
+
 	mockSvc := mocksvc.NewMockTenantService(ctrl)
 	mockSvc.EXPECT().
-		GetByID(gomock.Any(), "uuid-001").
-		Return(&dto.TenantResult{ID: "uuid-001", Name: "Acme", Email: "admin@acme.com", Status: "active"}, nil).
+		GetByID(gomock.Any(), testIDStr).
+		Return(&dto.TenantResult{ID: testID, Name: "Acme", Email: "admin@acme.com", Status: "active"}, nil).
 		Times(1)
 
 	h := handler.NewTenantHandler(mockSvc)
@@ -56,7 +62,7 @@ func TestTenantHandler_GetByID(t *testing.T) {
 	r.GET("/tenants/:id", h.GetByID)
 
 	w := httptest.NewRecorder()
-	req, _ := http.NewRequest(http.MethodGet, "/tenants/uuid-001", nil)
+	req, _ := http.NewRequest(http.MethodGet, "/tenants/"+testIDStr, nil)
 	r.ServeHTTP(w, req)
 
 	assert.Equal(t, http.StatusOK, w.Code)
