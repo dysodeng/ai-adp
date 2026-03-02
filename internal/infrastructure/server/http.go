@@ -29,10 +29,10 @@ func NewHTTPServer(cfg *config.Config, tenantHandler *handler.TenantHandler) *HT
 	return &HTTPServer{
 		engine: r,
 		server: &http.Server{
-			Addr:         fmt.Sprintf(":%d", cfg.App.Port),
+			Addr:         fmt.Sprintf(":%d", cfg.Server.HTTP.Port),
 			Handler:      r,
-			ReadTimeout:  30 * time.Second,
-			WriteTimeout: 60 * time.Second,
+			ReadTimeout:  time.Duration(cfg.Server.HTTP.ReadTimeout) * time.Second,
+			WriteTimeout: time.Duration(cfg.Server.HTTP.WriteTimeout) * time.Second,
 		},
 	}
 }
