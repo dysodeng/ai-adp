@@ -22,9 +22,12 @@ var InfrastructureSet = wire.NewSet(
 	provideTracerShutdown,
 )
 
-// provideLogger extracts LoggerConfig from Config and calls logger.New
+// provideLogger 初始化全局 logger 并返回底层 *zap.Logger
 func provideLogger(cfg *config.Config) (*zap.Logger, error) {
-	return logger.New(cfg.Logger)
+	if err := logger.InitLogger(cfg.Logger); err != nil {
+		return nil, err
+	}
+	return logger.ZapLogger(), nil
 }
 
 // provideTracerShutdown initialises OpenTelemetry tracing (sets the global provider)
