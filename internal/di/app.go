@@ -11,16 +11,18 @@ import (
 
 	"go.uber.org/zap"
 	"github.com/dysodeng/ai-adp/internal/infrastructure/server"
+	"github.com/dysodeng/ai-adp/internal/infrastructure/telemetry"
 )
 
 // App 应用主结构
 type App struct {
-	httpServer *server.HTTPServer
-	logger     *zap.Logger
+	httpServer      *server.HTTPServer
+	logger          *zap.Logger
+	tracerShutdown  telemetry.ShutdownFunc
 }
 
-func NewApp(httpServer *server.HTTPServer, logger *zap.Logger) *App {
-	return &App{httpServer: httpServer, logger: logger}
+func NewApp(httpServer *server.HTTPServer, logger *zap.Logger, tracerShutdown telemetry.ShutdownFunc) *App {
+	return &App{httpServer: httpServer, logger: logger, tracerShutdown: tracerShutdown}
 }
 
 // Run 启动服务，阻塞直到收到退出信号
@@ -47,6 +49,7 @@ func (a *App) Run() error {
 			a.logger.Error("Shutdown error", zap.Error(err))
 			return err
 		}
+		a.tracerShutdown()
 		a.logger.Info("Server stopped gracefully")
 		return nil
 	}

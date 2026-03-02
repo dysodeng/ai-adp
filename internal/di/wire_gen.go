@@ -34,6 +34,10 @@ func InitApp(configPath string) (*App, error) {
 	if err != nil {
 		return nil, err
 	}
-	app := NewApp(httpServer, logger)
+	shutdownFunc, err := provideTracerShutdown(configConfig)
+	if err != nil {
+		return nil, err
+	}
+	app := NewApp(httpServer, logger, shutdownFunc)
 	return app, nil
 }

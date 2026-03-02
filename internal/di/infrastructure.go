@@ -9,6 +9,7 @@ import (
 	"github.com/dysodeng/ai-adp/internal/infrastructure/persistence"
 	"github.com/dysodeng/ai-adp/internal/infrastructure/persistence/transactions"
 	"github.com/dysodeng/ai-adp/internal/infrastructure/server"
+	"github.com/dysodeng/ai-adp/internal/infrastructure/telemetry"
 )
 
 // InfrastructureSet wires all infrastructure components
@@ -18,9 +19,17 @@ var InfrastructureSet = wire.NewSet(
 	transactions.NewManager,
 	server.NewHTTPServer,
 	provideLogger,
+	provideTracerShutdown,
 )
 
 // provideLogger extracts LoggerConfig from Config and calls logger.New
 func provideLogger(cfg *config.Config) (*zap.Logger, error) {
 	return logger.New(cfg.Logger)
+}
+
+// provideTracerShutdown initialises OpenTelemetry tracing (sets the global provider)
+// and returns the shutdown function to be called on application exit.
+func provideTracerShutdown(cfg *config.Config) (telemetry.ShutdownFunc, error) {
+	_, shutdown, err := telemetry.NewTracerProvider(cfg.Tracing)
+	return shutdown, err
 }

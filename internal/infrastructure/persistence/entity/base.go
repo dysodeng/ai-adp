@@ -9,22 +9,21 @@ import (
 
 // Base 所有 GORM 实体的基类，主键使用 UUID v7
 type Base struct {
-	ID        string         `gorm:"type:varchar(36);primaryKey"`
-	CreatedAt time.Time      `gorm:"autoCreateTime"`
-	UpdatedAt time.Time      `gorm:"autoUpdateTime"`
-	DeletedAt gorm.DeletedAt `gorm:"index"`
+	ID        uuid.UUID `gorm:"type:uuid;not null;primaryKey"`
+	CreatedAt time.Time `gorm:"autoCreateTime;index:idx_created"`
+	UpdatedAt time.Time `gorm:"autoUpdateTime"`
 }
 
 // GenerateID 生成 UUID v7，供 BeforeCreate hook 和测试使用
 func (b *Base) GenerateID() error {
-	if b.ID != "" {
+	if b.ID != uuid.Nil {
 		return nil
 	}
 	id, err := uuid.NewV7()
 	if err != nil {
 		return err
 	}
-	b.ID = id.String()
+	b.ID = id
 	return nil
 }
 

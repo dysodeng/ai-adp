@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 
+	"github.com/google/uuid"
 	"gorm.io/gorm"
 
 	sharederrors "github.com/dysodeng/ai-adp/internal/domain/shared/errors"
@@ -27,7 +28,13 @@ func NewTenantRepository(db *gorm.DB) *TenantRepositoryImpl {
 
 func (r *TenantRepositoryImpl) Save(ctx context.Context, tenant *domainmodel.Tenant) error {
 	e := &entity.TenantEntity{}
-	e.ID = tenant.ID()
+	if id := tenant.ID(); id != "" {
+		parsed, err := uuid.Parse(id)
+		if err != nil {
+			return err
+		}
+		e.ID = parsed
+	}
 	e.Name = tenant.Name()
 	e.Email = tenant.Email()
 	e.Status = string(tenant.Status())
@@ -42,7 +49,7 @@ func (r *TenantRepositoryImpl) FindByID(ctx context.Context, id string) (*domain
 		}
 		return nil, err
 	}
-	return domainmodel.Reconstitute(e.ID, e.Name, e.Email, tenantvo.TenantStatus(e.Status)), nil
+	return domainmodel.Reconstitute(e.ID.String(), e.Name, e.Email, tenantvo.TenantStatus(e.Status)), nil
 }
 
 func (r *TenantRepositoryImpl) FindAll(ctx context.Context, pagination valueobject.Pagination) ([]*domainmodel.Tenant, int64, error) {
@@ -59,7 +66,7 @@ func (r *TenantRepositoryImpl) FindAll(ctx context.Context, pagination valueobje
 
 	tenants := make([]*domainmodel.Tenant, 0, len(entities))
 	for _, e := range entities {
-		tenants = append(tenants, domainmodel.Reconstitute(e.ID, e.Name, e.Email, tenantvo.TenantStatus(e.Status)))
+		tenants = append(tenants, domainmodel.Reconstitute(e.ID.String(), e.Name, e.Email, tenantvo.TenantStatus(e.Status)))
 	}
 	return tenants, total, nil
 }

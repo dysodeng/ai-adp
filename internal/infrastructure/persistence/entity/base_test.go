@@ -3,23 +3,28 @@ package entity_test
 import (
 	"testing"
 
-	"github.com/dysodeng/ai-adp/internal/infrastructure/persistence/entity"
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
+	"github.com/dysodeng/ai-adp/internal/infrastructure/persistence/entity"
 )
 
 func TestBase_IDGeneratedOnCreate(t *testing.T) {
 	b := &entity.Base{}
-	assert.Empty(t, b.ID)
+	assert.Equal(t, uuid.Nil, b.ID)
 
 	err := b.GenerateID()
 	assert.NoError(t, err)
-	assert.NotEmpty(t, b.ID)
-	assert.Len(t, b.ID, 36) // UUID v7 standard format
+	assert.NotEqual(t, uuid.Nil, b.ID)
+	// UUID v7 string representation is 36 characters
+	assert.Len(t, b.ID.String(), 36)
 }
 
 func TestBase_IDNotOverwrittenIfSet(t *testing.T) {
-	b := &entity.Base{ID: "existing-id"}
-	err := b.GenerateID()
+	existing, err := uuid.NewV7()
 	assert.NoError(t, err)
-	assert.Equal(t, "existing-id", b.ID)
+
+	b := &entity.Base{ID: existing}
+	err = b.GenerateID()
+	assert.NoError(t, err)
+	assert.Equal(t, existing, b.ID)
 }
