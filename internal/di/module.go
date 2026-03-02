@@ -3,9 +3,9 @@ package di
 import (
 	"github.com/google/wire"
 
-	tenantrepo "github.com/dysodeng/ai-adp/internal/infrastructure/persistence/repository/tenant"
-	domainrepo "github.com/dysodeng/ai-adp/internal/domain/tenant/repository"
 	tenantappsvc "github.com/dysodeng/ai-adp/internal/application/tenant/service"
+	domainrepo "github.com/dysodeng/ai-adp/internal/domain/tenant/repository"
+	tenantrepo "github.com/dysodeng/ai-adp/internal/infrastructure/persistence/repository/tenant"
 	tenanthandler "github.com/dysodeng/ai-adp/internal/interfaces/http/handler"
 )
 
