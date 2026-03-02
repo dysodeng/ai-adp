@@ -26,14 +26,14 @@ func InitApp(configPath string) (*App, error) {
 	if err != nil {
 		return nil, err
 	}
-	logger, err := provideLogger(configConfig)
-	if err != nil {
-		return nil, err
-	}
 	tenantRepositoryImpl := tenant.NewTenantRepository(db)
 	tenantAppService := service.NewTenantAppService(tenantRepositoryImpl)
 	tenantHandler := handler.NewTenantHandler(tenantAppService)
 	httpServer := server.NewHTTPServer(configConfig, tenantHandler)
+	logger, err := provideLogger(configConfig)
+	if err != nil {
+		return nil, err
+	}
 	app := NewApp(httpServer, logger)
 	return app, nil
 }
