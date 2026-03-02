@@ -8,7 +8,8 @@ import (
 	"github.com/dysodeng/ai-adp/internal/infrastructure/logger"
 )
 
-// Logger 记录 HTTP 访问日志，自动从 Gin context 中获取 OTel trace context
+// Logger 记录 HTTP 访问日志，自动从 Gin context 中获取 OTel trace context。
+// 注意：必须在 Tracing() 中间件之后注册，以确保 c.Request.Context() 中已注入 span。
 func Logger() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		start := time.Now()
