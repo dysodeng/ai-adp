@@ -1,5 +1,7 @@
 package dto
 
+import "github.com/google/uuid"
+
 // CreateTenantCommand 创建租户命令
 type CreateTenantCommand struct {
 	Name  string `json:"name"`
@@ -8,16 +10,16 @@ type CreateTenantCommand struct {
 
 // UpdateTenantCommand 更新租户命令
 type UpdateTenantCommand struct {
-	ID   string `json:"id"`
-	Name string `json:"name"`
+	ID   uuid.UUID `json:"id"`
+	Name string    `json:"name"`
 }
 
 // TenantResult 租户查询结果
 type TenantResult struct {
-	ID     string `json:"id"`
-	Name   string `json:"name"`
-	Email  string `json:"email"`
-	Status string `json:"status"`
+	ID     uuid.UUID `json:"id"`
+	Name   string    `json:"name"`
+	Email  string    `json:"email"`
+	Status string    `json:"status"`
 }
 
 // ListTenantsQuery 分页查询参数

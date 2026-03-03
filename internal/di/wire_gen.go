@@ -9,7 +9,6 @@ package di
 import (
 	"github.com/dysodeng/ai-adp/internal/application/tenant/service"
 	"github.com/dysodeng/ai-adp/internal/infrastructure/config"
-	"github.com/dysodeng/ai-adp/internal/infrastructure/persistence"
 	"github.com/dysodeng/ai-adp/internal/infrastructure/persistence/repository/tenant"
 	"github.com/dysodeng/ai-adp/internal/infrastructure/server"
 	"github.com/dysodeng/ai-adp/internal/interfaces/http/handler"
@@ -22,7 +21,7 @@ func InitApp(configPath string) (*App, error) {
 	if err != nil {
 		return nil, err
 	}
-	db, err := persistence.NewDB(configConfig)
+	db, err := provideDB(configConfig)
 	if err != nil {
 		return nil, err
 	}

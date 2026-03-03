@@ -1,12 +1,17 @@
 package di
 
 import (
+	"fmt"
+
 	"github.com/google/wire"
 	"go.uber.org/zap"
+	"gorm.io/gorm"
+
 	"github.com/dysodeng/ai-adp/internal/infrastructure/cache"
 	"github.com/dysodeng/ai-adp/internal/infrastructure/config"
 	"github.com/dysodeng/ai-adp/internal/infrastructure/logger"
 	"github.com/dysodeng/ai-adp/internal/infrastructure/persistence"
+	"github.com/dysodeng/ai-adp/internal/infrastructure/persistence/migration"
 	"github.com/dysodeng/ai-adp/internal/infrastructure/persistence/transactions"
 	"github.com/dysodeng/ai-adp/internal/infrastructure/server"
 	"github.com/dysodeng/ai-adp/internal/infrastructure/telemetry"
@@ -14,13 +19,25 @@ import (
 
 // InfrastructureSet wires all infrastructure components
 var InfrastructureSet = wire.NewSet(
-	persistence.NewDB,
+	provideDB,
 	cache.NewRedisClient,
 	transactions.NewManager,
 	server.NewHTTPServer,
 	provideLogger,
 	provideTracerShutdown,
 )
+
+// provideDB 初始化 DB 连接并自动执行迁移
+func provideDB(cfg *config.Config) (*gorm.DB, error) {
+	db, err := persistence.NewDB(cfg)
+	if err != nil {
+		return nil, err
+	}
+	if err := migration.AutoMigrate(db); err != nil {
+		return nil, fmt.Errorf("auto migrate failed: %w", err)
+	}
+	return db, nil
+}
 
 // provideLogger 初始化全局 logger 并返回底层 *zap.Logger
 func provideLogger(cfg *config.Config) (*zap.Logger, error) {

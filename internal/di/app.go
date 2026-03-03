@@ -2,46 +2,29 @@ package di
 
 import (
 	"context"
-	"os"
-	"os/signal"
-	"syscall"
-	"time"
 
 	"go.uber.org/zap"
+
 	"github.com/dysodeng/ai-adp/internal/infrastructure/server"
 	"github.com/dysodeng/ai-adp/internal/infrastructure/telemetry"
 )
 
-// App 应用主结构
+// App 持有所有服务实例和清理函数，由 cmd/app 驱动生命周期
 type App struct {
-	httpServer      *server.HTTPServer
-	logger          *zap.Logger
-	tracerShutdown  telemetry.ShutdownFunc
+	HTTPServer     server.Server
+	tracerShutdown telemetry.ShutdownFunc
 }
 
-func NewApp(httpServer *server.HTTPServer, logger *zap.Logger, tracerShutdown telemetry.ShutdownFunc) *App {
-	return &App{httpServer: httpServer, logger: logger, tracerShutdown: tracerShutdown}
+// NewApp 构造 App。_ *zap.Logger 确保 Wire 在构建 App 前初始化全局 logger（顺序依赖）。
+func NewApp(httpServer *server.HTTPServer, _ *zap.Logger, tracerShutdown telemetry.ShutdownFunc) *App {
+	return &App{
+		HTTPServer:     httpServer,
+		tracerShutdown: tracerShutdown,
+	}
 }
 
-// Run 启动服务，阻塞直到收到退出信号
-func (a *App) Run() error {
-	a.logger.Info("HTTP server starting")
-	if err := a.httpServer.Start(); err != nil {
-		return err
-	}
-
-	quit := make(chan os.Signal, 1)
-	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
-
-	sig := <-quit
-	a.logger.Info("Shutting down", zap.String("signal", sig.String()))
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-	if err := a.httpServer.Stop(ctx); err != nil {
-		a.logger.Error("Shutdown error", zap.Error(err))
-		return err
-	}
+// Stop 释放应用资源（tracer flush 等），在所有 Server 停止后调用
+func (a *App) Stop(ctx context.Context) error {
 	a.tracerShutdown()
-	a.logger.Info("Server stopped gracefully")
 	return nil
 }
