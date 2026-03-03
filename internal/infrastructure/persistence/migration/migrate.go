@@ -1,8 +1,8 @@
 package migration
 
 import (
-	"gorm.io/gorm"
 	"github.com/dysodeng/ai-adp/internal/infrastructure/persistence/entity"
+	"gorm.io/gorm"
 )
 
 // AutoMigrate runs GORM auto-migration for all registered entities.
@@ -11,5 +11,6 @@ func AutoMigrate(db *gorm.DB) error {
 	return db.AutoMigrate(
 		&entity.TenantEntity{},
 		&entity.WorkspaceEntity{},
+		&entity.ModelConfigEntity{}, // 新增
 	)
 }
