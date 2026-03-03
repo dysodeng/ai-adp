@@ -74,9 +74,12 @@ func (a *application) waitForInterruptSignal() {
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
+	// 取消信号订阅，避免 shutdown 期间再次触发
+	signal.Stop(quit)
 
 	logger.Info(a.ctx, "shutting down servers...")
 
+	// 5 秒关闭预算由所有 Server.Stop 和 mainApp.Stop 共享
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 

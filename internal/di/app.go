@@ -5,6 +5,7 @@ import (
 
 	"go.uber.org/zap"
 
+	"github.com/dysodeng/ai-adp/internal/infrastructure/logger"
 	"github.com/dysodeng/ai-adp/internal/infrastructure/server"
 	"github.com/dysodeng/ai-adp/internal/infrastructure/telemetry"
 )
@@ -23,8 +24,9 @@ func NewApp(httpServer *server.HTTPServer, _ *zap.Logger, tracerShutdown telemet
 	}
 }
 
-// Stop 释放应用资源（tracer flush 等），在所有 Server 停止后调用
+// Stop 释放应用资源，在所有 Server 停止后调用
 func (a *App) Stop(ctx context.Context) error {
-	a.tracerShutdown()
-	return nil
+	// 刷新日志缓冲，防止文件输出丢失最后几行
+	_ = logger.ZapLogger().Sync()
+	return a.tracerShutdown(ctx)
 }

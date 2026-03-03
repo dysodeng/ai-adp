@@ -14,7 +14,8 @@ import (
 )
 
 // ShutdownFunc is called on application shutdown to flush and stop the tracer.
-type ShutdownFunc func()
+// The context should carry the caller's deadline to bound the flush duration.
+type ShutdownFunc func(context.Context) error
 
 // NewTracerProvider initialises OpenTelemetry tracing.
 // When cfg.Enabled is false, a no-op tracer provider is returned.
@@ -24,7 +25,7 @@ func NewTracerProvider(cfg config.TracingConfig) (trace.TracerProvider, Shutdown
 	if !cfg.Enabled {
 		tp := noop.NewTracerProvider()
 		otel.SetTracerProvider(tp)
-		return tp, func() {}, nil
+		return tp, func(_ context.Context) error { return nil }, nil
 	}
 
 	serviceName := cfg.ServiceName
@@ -55,8 +56,8 @@ func NewTracerProvider(cfg config.TracingConfig) (trace.TracerProvider, Shutdown
 
 	otel.SetTracerProvider(tp)
 
-	shutdown := func() {
-		_ = tp.Shutdown(context.Background())
+	shutdown := func(ctx context.Context) error {
+		return tp.Shutdown(ctx)
 	}
 	return tp, shutdown, nil
 }
