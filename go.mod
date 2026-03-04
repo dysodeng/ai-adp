@@ -3,11 +3,15 @@ module github.com/dysodeng/ai-adp
 go 1.25.0
 
 require (
+	github.com/cloudwego/eino v0.7.37
+	github.com/cloudwego/eino-ext/components/model/ark v0.1.65
+	github.com/cloudwego/eino-ext/components/model/claude v0.1.15
+	github.com/cloudwego/eino-ext/components/model/ollama v0.1.8
+	github.com/cloudwego/eino-ext/components/model/openai v0.1.8
 	github.com/gin-gonic/gin v1.12.0
 	github.com/google/uuid v1.6.0
 	github.com/google/wire v0.7.0
 	github.com/redis/go-redis/v9 v9.18.0
-	github.com/spf13/cobra v1.10.2
 	github.com/spf13/viper v1.21.0
 	github.com/stretchr/testify v1.11.1
 	go.opentelemetry.io/otel v1.40.0
@@ -40,11 +44,9 @@ require (
 	github.com/aws/smithy-go v1.22.1 // indirect
 	github.com/bahlo/generic-list-go v0.2.0 // indirect
 	github.com/buger/jsonparser v1.1.1 // indirect
-	github.com/cloudwego/eino v0.7.37 // indirect
-	github.com/cloudwego/eino-ext/components/model/ark v0.1.65 // indirect
-	github.com/cloudwego/eino-ext/components/model/claude v0.1.15 // indirect
-	github.com/cloudwego/eino-ext/components/model/ollama v0.1.8 // indirect
-	github.com/cloudwego/eino-ext/components/model/openai v0.1.8 // indirect
+	github.com/cloudwego/eino-ext/components/embedding/ark v0.1.1 // indirect
+	github.com/cloudwego/eino-ext/components/embedding/ollama v0.0.0-20260302070227-13ce9b3fa975 // indirect
+	github.com/cloudwego/eino-ext/components/embedding/openai v0.0.0-20260302070227-13ce9b3fa975 // indirect
 	github.com/cloudwego/eino-ext/libs/acl/openai v0.1.13 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/eino-contrib/jsonschema v1.0.3 // indirect
@@ -57,12 +59,14 @@ require (
 	github.com/googleapis/enterprise-certificate-proxy v0.3.2 // indirect
 	github.com/goph/emperror v0.17.2 // indirect
 	github.com/jmespath/go-jmespath v0.4.0 // indirect
-	github.com/mailru/easyjson v0.7.7 // indirect
+	github.com/mailru/easyjson v0.9.0 // indirect
 	github.com/meguminnnnnnnnn/go-openai v0.1.1 // indirect
 	github.com/nikolalohinski/gonja v1.5.3 // indirect
+	github.com/ollama/ollama v0.9.6 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/sirupsen/logrus v1.9.3 // indirect
 	github.com/slongfield/pyfmt v0.0.0-20220222012616-ea85ff4c361f // indirect
+	github.com/smarty/assertions v1.16.0 // indirect
 	github.com/tidwall/gjson v1.18.0 // indirect
 	github.com/tidwall/match v1.1.1 // indirect
 	github.com/tidwall/pretty v1.2.1 // indirect
@@ -74,13 +78,13 @@ require (
 	go.opencensus.io v0.24.0 // indirect
 	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.49.0 // indirect
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.49.0 // indirect
-	golang.org/x/exp v0.0.0-20250218142911-aa4b98e5adaa // indirect
-	golang.org/x/oauth2 v0.21.0 // indirect
+	golang.org/x/exp v0.0.0-20250305212735-054e65f0b394 // indirect
+	golang.org/x/oauth2 v0.27.0 // indirect
 	golang.org/x/time v0.5.0 // indirect
 	google.golang.org/api v0.189.0 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20240722135656-d784300faade // indirect
 	google.golang.org/grpc v1.64.1 // indirect
-	gopkg.in/yaml.v2 v2.2.8 // indirect
+	gopkg.in/yaml.v2 v2.4.0 // indirect
 )
 
 require (
@@ -102,7 +106,6 @@ require (
 	github.com/go-viper/mapstructure/v2 v2.4.0 // indirect
 	github.com/goccy/go-json v0.10.5 // indirect
 	github.com/goccy/go-yaml v1.19.2 // indirect
-	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/jackc/pgpassfile v1.0.0 // indirect
 	github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761 // indirect
 	github.com/jackc/pgx/v5 v5.6.0 // indirect
