@@ -5,6 +5,7 @@ import (
 
 	"go.uber.org/zap"
 
+	ai "github.com/dysodeng/ai-adp/internal/infrastructure/ai"
 	"github.com/dysodeng/ai-adp/internal/infrastructure/logger"
 	"github.com/dysodeng/ai-adp/internal/infrastructure/server"
 	"github.com/dysodeng/ai-adp/internal/infrastructure/telemetry"
@@ -13,13 +14,15 @@ import (
 // App 持有所有服务实例和清理函数，由 cmd/app 驱动生命周期
 type App struct {
 	HTTPServer     server.Server
+	AIComponents   *ai.Components
 	tracerShutdown telemetry.ShutdownFunc
 }
 
 // NewApp 构造 App。_ *zap.Logger 确保 Wire 在构建 App 前初始化全局 logger（顺序依赖）。
-func NewApp(httpServer *server.HTTPServer, _ *zap.Logger, tracerShutdown telemetry.ShutdownFunc) *App {
+func NewApp(httpServer *server.HTTPServer, aiComponents *ai.Components, _ *zap.Logger, tracerShutdown telemetry.ShutdownFunc) *App {
 	return &App{
 		HTTPServer:     httpServer,
+		AIComponents:   aiComponents,
 		tracerShutdown: tracerShutdown,
 	}
 }
