@@ -9,7 +9,7 @@ import (
 	agentservice "github.com/dysodeng/ai-adp/internal/domain/agent/service"
 	appdomainrepo "github.com/dysodeng/ai-adp/internal/domain/app/repository"
 	"github.com/dysodeng/ai-adp/internal/domain/shared/port"
-	infraagent "github.com/dysodeng/ai-adp/internal/infrastructure/agent"
+	"github.com/dysodeng/ai-adp/internal/infrastructure/agent/adapter"
 	"github.com/dysodeng/ai-adp/internal/infrastructure/logger"
 	"github.com/dysodeng/ai-adp/internal/infrastructure/server"
 	"github.com/dysodeng/ai-adp/internal/infrastructure/telemetry"
@@ -31,7 +31,7 @@ func NewApp(
 	tracerShutdown telemetry.ShutdownFunc,
 	_ port.ToolService,
 	_ agentservice.AgentBuilder,
-	_ *infraagent.AgentFactory,
+	_ *adapter.AgentFactory,
 	// 取消能力组件
 	cancelBroadcaster executor.CancelBroadcaster,
 	taskRegistry executor.TaskRegistry,
