@@ -213,10 +213,13 @@ func (e *agentExecutorImpl) Subscribe() <-chan *model.Event {
 
 	ch := make(chan *model.Event, 100)
 
+	taskID := e.taskID.String()
+
 	// 如果 executor 已经在运行，重放 start 事件
 	if e.status == model.ExecutionStatusRunning {
 		ch <- &model.Event{
 			Type:      model.EventTypeStart,
+			TaskID:    taskID,
 			Timestamp: e.startTime,
 		}
 	}
@@ -226,6 +229,7 @@ func (e *agentExecutorImpl) Subscribe() <-chan *model.Event {
 	case model.ExecutionStatusCompleted:
 		ch <- &model.Event{
 			Type:      model.EventTypeComplete,
+			TaskID:    taskID,
 			Timestamp: e.endTime,
 			Data:      e.output,
 		}
@@ -234,6 +238,7 @@ func (e *agentExecutorImpl) Subscribe() <-chan *model.Event {
 	case model.ExecutionStatusFailed:
 		ch <- &model.Event{
 			Type:      model.EventTypeError,
+			TaskID:    taskID,
 			Timestamp: e.endTime,
 			Data:      e.err,
 		}
@@ -283,6 +288,7 @@ func (e *agentExecutorImpl) GetOutput() *model.ExecutionOutput {
 
 // broadcastEvent 发布事件到所有订阅者（调用方必须已持有锁）
 func (e *agentExecutorImpl) broadcastEvent(event *model.Event) {
+	event.TaskID = e.taskID.String()
 	for _, ch := range e.subscribers {
 		select {
 		case ch <- event:

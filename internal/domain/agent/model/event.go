@@ -36,6 +36,7 @@ const (
 // Event 领域事件
 type Event struct {
 	Type      EventType   `json:"type"`
+	TaskID    string      `json:"task_id"`
 	Timestamp time.Time   `json:"timestamp"`
 	Data      interface{} `json:"data,omitempty"`
 }
