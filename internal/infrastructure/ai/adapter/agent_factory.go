@@ -41,12 +41,10 @@ func (f *AgentFactory) CreateAgent(
 		return NewTextCompletionAgent(ctx, config, modelConfig)
 
 	case valueobject.AppTypeChat:
-		// TODO: 实现 ChatAgent
-		return nil, fmt.Errorf("ChatAgent not implemented yet")
+		return NewChatAgent(ctx, config, modelConfig)
 
 	case valueobject.AppTypeAgent:
-		// TODO: 实现 ReActAgent
-		return nil, fmt.Errorf("ReActAgent not implemented yet")
+		return NewReActAgent(ctx, config, modelConfig)
 
 	default:
 		return nil, fmt.Errorf("unsupported app type: %s", appType)
