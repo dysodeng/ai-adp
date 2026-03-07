@@ -2,6 +2,7 @@ package orchestrator
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	domainagent "github.com/dysodeng/ai-adp/internal/domain/agent/agent"
@@ -21,16 +22,19 @@ type ExecutorOrchestrator interface {
 type executorOrchestrator struct {
 	agentBuilder service.AgentBuilder
 	agentFactory *adapter.AgentFactory
+	taskRegistry executor.TaskRegistry
 }
 
 // NewExecutorOrchestrator 创建执行编排器
 func NewExecutorOrchestrator(
 	agentBuilder service.AgentBuilder,
 	agentFactory *adapter.AgentFactory,
+	taskRegistry executor.TaskRegistry,
 ) ExecutorOrchestrator {
 	return &executorOrchestrator{
 		agentBuilder: agentBuilder,
 		agentFactory: agentFactory,
+		taskRegistry: taskRegistry,
 	}
 }
 
@@ -62,14 +66,22 @@ func (o *executorOrchestrator) Execute(
 	}
 	logger.Info(ctx, "[orchestrator] CreateAgent done")
 
-	// 3. 启动执行
+	// 3. 创建可取消的 context 并注册到 TaskRegistry
+	taskID := agentExecutor.GetTaskID().String()
+	execCtx, cancel := context.WithCancel(ctx)
+	o.taskRegistry.Register(taskID, cancel)
+
+	// 4. 启动执行
 	agentExecutor.Start()
 	logger.Info(ctx, "[orchestrator] agentExecutor.Start() done, launching goroutine")
 
-	// 4. 异步执行 Agent
-	go o.executeAgent(ctx, ag, agentExecutor)
+	// 5. 异步执行 Agent
+	go func() {
+		defer o.taskRegistry.Unregister(taskID)
+		o.executeAgent(execCtx, ag, agentExecutor)
+	}()
 
-	// 5. 如果是阻塞模式，等待完成
+	// 6. 如果是阻塞模式，等待完成
 	if !isStreaming {
 		eventChan := agentExecutor.AddSubscriber()
 		for range eventChan {
@@ -96,6 +108,11 @@ func (o *executorOrchestrator) executeAgent(ctx context.Context, ag domainagent.
 
 	logger.Info(ctx, "[orchestrator] calling ag.Execute ...")
 	if err := ag.Execute(ctx, agentExecutor); err != nil {
+		if errors.Is(err, context.Canceled) {
+			logger.Info(ctx, "[orchestrator] agent execution cancelled")
+			agentExecutor.Cancel()
+			return
+		}
 		logger.Error(ctx, "[orchestrator] ag.Execute failed", logger.ErrorField(err))
 		agentExecutor.Fail(err)
 		return

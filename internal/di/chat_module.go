@@ -13,4 +13,5 @@ var ChatModuleSet = wire.NewSet(
 	chatorch.NewExecutorOrchestrator,
 	chatservice.NewChatAppService,
 	handler.NewChatHandler,
+	handler.NewCancelHandler,
 )

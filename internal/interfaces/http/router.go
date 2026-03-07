@@ -11,13 +11,15 @@ import (
 type Router struct {
 	tenantHandler *handler.TenantHandler
 	chatHandler   *handler.ChatHandler
+	cancelHandler *handler.CancelHandler
 }
 
 // NewRouter 创建路由管理器
-func NewRouter(tenantHandler *handler.TenantHandler, chatHandler *handler.ChatHandler) *Router {
+func NewRouter(tenantHandler *handler.TenantHandler, chatHandler *handler.ChatHandler, cancelHandler *handler.CancelHandler) *Router {
 	return &Router{
 		tenantHandler: tenantHandler,
 		chatHandler:   chatHandler,
+		cancelHandler: cancelHandler,
 	}
 }
 
@@ -51,5 +53,6 @@ func (r *Router) registerV1Routes(v1 *gin.RouterGroup) {
 	chats := v1.Group("/chat", middleware.AppApiKey)
 	{
 		chats.POST("/send-messages", r.chatHandler.Chat)
+		chats.POST("/tasks/:task_id/cancel", r.cancelHandler.Cancel)
 	}
 }

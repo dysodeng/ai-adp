@@ -62,6 +62,11 @@ func (a *application) serve() {
 		// 未来扩展: a.mainApp.GRPCServer, a.mainApp.WSServer
 	)
 
+	// 启动取消信号订阅
+	if err := a.mainApp.StartCancelSubscriber(a.ctx); err != nil {
+		logger.Error(a.ctx, "failed to start cancel subscriber", logger.ErrorField(err))
+	}
+
 	for _, s := range a.servers {
 		if err := s.Start(); err != nil {
 			logger.Fatal(a.ctx, fmt.Sprintf("%s server failed to start", s.Name()), logger.ErrorField(err))

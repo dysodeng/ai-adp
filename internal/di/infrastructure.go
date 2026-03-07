@@ -7,9 +7,11 @@ import (
 	"go.uber.org/zap"
 	"gorm.io/gorm"
 
+	"github.com/dysodeng/ai-adp/internal/domain/agent/executor"
 	agentservice "github.com/dysodeng/ai-adp/internal/domain/agent/service"
 	modeldomainrepo "github.com/dysodeng/ai-adp/internal/domain/model/repository"
 	"github.com/dysodeng/ai-adp/internal/domain/shared/port"
+	infraagent "github.com/dysodeng/ai-adp/internal/infrastructure/agent"
 	"github.com/dysodeng/ai-adp/internal/infrastructure/ai/adapter"
 	"github.com/dysodeng/ai-adp/internal/infrastructure/ai/engine"
 	"github.com/dysodeng/ai-adp/internal/infrastructure/cache"
@@ -35,6 +37,11 @@ var InfrastructureSet = wire.NewSet(
 	port.NewMockToolService,
 	agentservice.NewAgentBuilder,
 	provideAgentFactory,
+	// 取消能力组件
+	infraagent.NewMemoryTaskRegistry,
+	wire.Bind(new(executor.TaskRegistry), new(*infraagent.MemoryTaskRegistry)),
+	infraagent.NewRedisCancelBroadcaster,
+	wire.Bind(new(executor.CancelBroadcaster), new(*infraagent.RedisCancelBroadcaster)),
 )
 
 // provideDB 初始化 DB 连接并自动执行迁移

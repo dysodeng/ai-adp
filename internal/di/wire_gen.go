@@ -12,7 +12,9 @@ import (
 	"github.com/dysodeng/ai-adp/internal/application/tenant/service"
 	service2 "github.com/dysodeng/ai-adp/internal/domain/agent/service"
 	"github.com/dysodeng/ai-adp/internal/domain/shared/port"
+	"github.com/dysodeng/ai-adp/internal/infrastructure/agent"
 	"github.com/dysodeng/ai-adp/internal/infrastructure/ai/engine"
+	"github.com/dysodeng/ai-adp/internal/infrastructure/cache"
 	"github.com/dysodeng/ai-adp/internal/infrastructure/config"
 	"github.com/dysodeng/ai-adp/internal/infrastructure/persistence/repository/app"
 	"github.com/dysodeng/ai-adp/internal/infrastructure/persistence/repository/model"
@@ -40,11 +42,15 @@ func InitApp(configPath string) (*App, error) {
 	agentBuilder := service2.NewAgentBuilder(toolService)
 	modelConfigRepositoryImpl := model.NewModelConfigRepository(db)
 	agentFactory := provideAgentFactory(modelConfigRepositoryImpl)
-	executorOrchestrator := orchestrator.NewExecutorOrchestrator(agentBuilder, agentFactory)
+	memoryTaskRegistry := agent.NewMemoryTaskRegistry()
+	executorOrchestrator := orchestrator.NewExecutorOrchestrator(agentBuilder, agentFactory, memoryTaskRegistry)
 	appRepositoryImpl := app.NewAppRepository(db)
 	chatAppService := service3.NewChatAppService(executorOrchestrator, appRepositoryImpl)
 	chatHandler := handler.NewChatHandler(chatAppService)
-	router := http.NewRouter(tenantHandler, chatHandler)
+	client := cache.NewRedisClient(configConfig)
+	redisCancelBroadcaster := agent.NewRedisCancelBroadcaster(client)
+	cancelHandler := handler.NewCancelHandler(memoryTaskRegistry, redisCancelBroadcaster)
+	router := http.NewRouter(tenantHandler, chatHandler, cancelHandler)
 	httpServer := server.NewHTTPServer(configConfig, router)
 	executorFactory := engine.NewExecutorFactory()
 	logger, err := provideLogger(configConfig)
@@ -55,6 +61,6 @@ func InitApp(configPath string) (*App, error) {
 	if err != nil {
 		return nil, err
 	}
-	diApp := NewApp(httpServer, executorFactory, appRepositoryImpl, logger, shutdownFunc, toolService, agentBuilder, agentFactory)
+	diApp := NewApp(httpServer, executorFactory, appRepositoryImpl, logger, shutdownFunc, toolService, agentBuilder, agentFactory, redisCancelBroadcaster, memoryTaskRegistry)
 	return diApp, nil
 }

@@ -106,6 +106,14 @@ func (e *agentExecutorImpl) Cancel() {
 	defer e.mu.Unlock()
 	e.status = model.ExecutionStatusCancelled
 	e.endTime = time.Now()
+	e.broadcastEvent(&model.Event{
+		Type:      model.EventTypeCancelled,
+		Timestamp: time.Now(),
+		Data: map[string]string{
+			"task_id": e.taskID.String(),
+			"reason":  "user_cancelled",
+		},
+	})
 	e.closeAllSubscribers()
 }
 

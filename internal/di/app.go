@@ -5,6 +5,7 @@ import (
 
 	"go.uber.org/zap"
 
+	"github.com/dysodeng/ai-adp/internal/domain/agent/executor"
 	agentservice "github.com/dysodeng/ai-adp/internal/domain/agent/service"
 	appdomainrepo "github.com/dysodeng/ai-adp/internal/domain/app/repository"
 	"github.com/dysodeng/ai-adp/internal/domain/shared/port"
@@ -17,8 +18,10 @@ import (
 
 // App 持有所有服务实例和清理函数，由 cmd/app 驱动生命周期
 type App struct {
-	HTTPServer     server.Server
-	tracerShutdown telemetry.ShutdownFunc
+	HTTPServer        server.Server
+	tracerShutdown    telemetry.ShutdownFunc
+	cancelBroadcaster executor.CancelBroadcaster
+	taskRegistry      executor.TaskRegistry
 }
 
 // NewApp 构造 App。_ *zap.Logger 确保 Wire 在构建 App 前初始化全局 logger（顺序依赖）。
@@ -32,11 +35,21 @@ func NewApp(
 	_ port.ToolService,
 	_ agentservice.AgentBuilder,
 	_ *adapter.AgentFactory,
+	// 取消能力组件
+	cancelBroadcaster executor.CancelBroadcaster,
+	taskRegistry executor.TaskRegistry,
 ) *App {
 	return &App{
-		HTTPServer:     httpServer,
-		tracerShutdown: tracerShutdown,
+		HTTPServer:        httpServer,
+		tracerShutdown:    tracerShutdown,
+		cancelBroadcaster: cancelBroadcaster,
+		taskRegistry:      taskRegistry,
 	}
+}
+
+// StartCancelSubscriber 启动取消信号订阅
+func (a *App) StartCancelSubscriber(ctx context.Context) error {
+	return a.cancelBroadcaster.Subscribe(ctx, a.taskRegistry)
 }
 
 // Stop 释放应用资源，在所有 Server 停止后调用
