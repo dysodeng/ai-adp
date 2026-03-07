@@ -5,6 +5,8 @@ import (
 
 	"go.uber.org/zap"
 
+	appdomainrepo "github.com/dysodeng/ai-adp/internal/domain/app/repository"
+	"github.com/dysodeng/ai-adp/internal/infrastructure/ai/engine"
 	"github.com/dysodeng/ai-adp/internal/infrastructure/logger"
 	"github.com/dysodeng/ai-adp/internal/infrastructure/server"
 	"github.com/dysodeng/ai-adp/internal/infrastructure/telemetry"
@@ -17,7 +19,13 @@ type App struct {
 }
 
 // NewApp 构造 App。_ *zap.Logger 确保 Wire 在构建 App 前初始化全局 logger（顺序依赖）。
-func NewApp(httpServer *server.HTTPServer, _ *zap.Logger, tracerShutdown telemetry.ShutdownFunc) *App {
+func NewApp(
+	httpServer *server.HTTPServer,
+	_ *engine.ExecutorFactory,
+	_ appdomainrepo.AppRepository,
+	_ *zap.Logger,
+	tracerShutdown telemetry.ShutdownFunc,
+) *App {
 	return &App{
 		HTTPServer:     httpServer,
 		tracerShutdown: tracerShutdown,

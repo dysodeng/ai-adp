@@ -8,7 +8,9 @@ package di
 
 import (
 	"github.com/dysodeng/ai-adp/internal/application/tenant/service"
+	"github.com/dysodeng/ai-adp/internal/infrastructure/ai/engine"
 	"github.com/dysodeng/ai-adp/internal/infrastructure/config"
+	"github.com/dysodeng/ai-adp/internal/infrastructure/persistence/repository/app"
 	"github.com/dysodeng/ai-adp/internal/infrastructure/persistence/repository/tenant"
 	"github.com/dysodeng/ai-adp/internal/infrastructure/server"
 	"github.com/dysodeng/ai-adp/internal/interfaces/http/handler"
@@ -29,6 +31,8 @@ func InitApp(configPath string) (*App, error) {
 	tenantAppService := service.NewTenantAppService(tenantRepositoryImpl)
 	tenantHandler := handler.NewTenantHandler(tenantAppService)
 	httpServer := server.NewHTTPServer(configConfig, tenantHandler)
+	executorFactory := engine.NewExecutorFactory()
+	appRepositoryImpl := app.NewAppRepository(db)
 	logger, err := provideLogger(configConfig)
 	if err != nil {
 		return nil, err
@@ -37,6 +41,6 @@ func InitApp(configPath string) (*App, error) {
 	if err != nil {
 		return nil, err
 	}
-	app := NewApp(httpServer, logger, shutdownFunc)
-	return app, nil
+	diApp := NewApp(httpServer, executorFactory, appRepositoryImpl, logger, shutdownFunc)
+	return diApp, nil
 }

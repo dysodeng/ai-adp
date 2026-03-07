@@ -7,6 +7,7 @@ import (
 	"go.uber.org/zap"
 	"gorm.io/gorm"
 
+	"github.com/dysodeng/ai-adp/internal/infrastructure/ai/engine"
 	"github.com/dysodeng/ai-adp/internal/infrastructure/cache"
 	"github.com/dysodeng/ai-adp/internal/infrastructure/config"
 	"github.com/dysodeng/ai-adp/internal/infrastructure/logger"
@@ -25,6 +26,7 @@ var InfrastructureSet = wire.NewSet(
 	server.NewHTTPServer,
 	provideLogger,
 	provideTracerShutdown,
+	engine.NewExecutorFactory, // AI 引擎工厂
 )
 
 // provideDB 初始化 DB 连接并自动执行迁移
