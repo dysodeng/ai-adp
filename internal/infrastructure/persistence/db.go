@@ -7,6 +7,7 @@ import (
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
+
 	"github.com/dysodeng/ai-adp/internal/infrastructure/config"
 )
 

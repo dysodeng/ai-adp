@@ -22,4 +22,11 @@ type AppRepository interface {
 	FindDraftVersion(ctx context.Context, appID uuid.UUID) (*appmodel.AppVersion, error)
 	FindVersionsByApp(ctx context.Context, appID uuid.UUID) ([]*appmodel.AppVersion, error)
 	FindVersionsByStatus(ctx context.Context, appID uuid.UUID, status valueobject.VersionStatus) ([]*appmodel.AppVersion, error)
+
+	SaveApiKey(ctx context.Context, apiKey *appmodel.AppApiKey) error
+	FindApiKeyByKey(ctx context.Context, key string) (*appmodel.AppApiKey, error)
+	FindApiKeysByApp(ctx context.Context, appID uuid.UUID) ([]*appmodel.AppApiKey, error)
+	DeleteApiKey(ctx context.Context, id uuid.UUID) error
+	FindAppWithPublishedVersion(ctx context.Context, appID uuid.UUID) (*appmodel.App, *appmodel.AppVersion, error)
+	FindAppByApiKey(ctx context.Context, key string) (*appmodel.App, *appmodel.AppVersion, error)
 }

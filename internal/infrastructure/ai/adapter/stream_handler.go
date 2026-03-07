@@ -10,20 +10,39 @@ import (
 	"github.com/dysodeng/ai-adp/internal/domain/agent/model"
 )
 
+// extractUsage 从 schema.Message 中提取 token usage 信息
+func extractUsage(msg *schema.Message) *model.TokenUsage {
+	if msg == nil || msg.ResponseMeta == nil || msg.ResponseMeta.Usage == nil {
+		return nil
+	}
+	u := msg.ResponseMeta.Usage
+	return &model.TokenUsage{
+		InputTokens:  u.PromptTokens,
+		OutputTokens: u.CompletionTokens,
+		TotalTokens:  u.TotalTokens,
+	}
+}
+
 // handleStreamingResult 处理 ADK 流式结果，将事件发布到 AgentExecutor
 func handleStreamingResult(
 	iter *adk.AsyncIterator[*adk.AgentEvent],
 	agentExecutor executor.AgentExecutor,
 ) error {
 	var fullContent string
+	var usage *model.TokenUsage
 	for {
 		event, ok := iter.Next()
 		if !ok {
+			// 发送 token_usage 事件
+			if usage != nil {
+				agentExecutor.PublishTokenUsage(usage)
+			}
 			agentExecutor.Complete(&model.ExecutionOutput{
 				Message: &model.Message{
 					Role:    "assistant",
 					Content: model.MessageContent{Content: fullContent},
 				},
+				Usage: usage,
 			})
 			return nil
 		}
@@ -46,14 +65,24 @@ func handleStreamingResult(
 					agentExecutor.Fail(err)
 					return err
 				}
-				if msg != nil && msg.Content != "" {
-					fullContent += msg.Content
-					agentExecutor.PublishChunk(msg.Content)
+				if msg != nil {
+					if msg.Content != "" {
+						fullContent += msg.Content
+						agentExecutor.PublishChunk(msg.Content)
+					}
+					if u := extractUsage(msg); u != nil {
+						usage = u
+					}
 				}
 			}
-		} else if mv.Message != nil && mv.Message.Content != "" {
-			fullContent += mv.Message.Content
-			agentExecutor.PublishChunk(mv.Message.Content)
+		} else if mv.Message != nil {
+			if mv.Message.Content != "" {
+				fullContent += mv.Message.Content
+				agentExecutor.PublishChunk(mv.Message.Content)
+			}
+			if u := extractUsage(mv.Message); u != nil {
+				usage = u
+			}
 		}
 	}
 }
@@ -64,14 +93,20 @@ func handleStreamingResultWithTools(
 	agentExecutor executor.AgentExecutor,
 ) error {
 	var fullContent string
+	var usage *model.TokenUsage
 	for {
 		event, ok := iter.Next()
 		if !ok {
+			// 发送 token_usage 事件
+			if usage != nil {
+				agentExecutor.PublishTokenUsage(usage)
+			}
 			agentExecutor.Complete(&model.ExecutionOutput{
 				Message: &model.Message{
 					Role:    "assistant",
 					Content: model.MessageContent{Content: fullContent},
 				},
+				Usage: usage,
 			})
 			return nil
 		}
@@ -97,11 +132,17 @@ func handleStreamingResultWithTools(
 					agentExecutor.PublishToolResult(&model.ToolResult{
 						Output: msg.Content,
 					})
+					if u := extractUsage(msg); u != nil {
+						usage = u
+					}
 				}
 			} else if mv.Message != nil {
 				agentExecutor.PublishToolResult(&model.ToolResult{
 					Output: mv.Message.Content,
 				})
+				if u := extractUsage(mv.Message); u != nil {
+					usage = u
+				}
 			}
 			continue
 		}
@@ -130,6 +171,9 @@ func handleStreamingResultWithTools(
 						fullContent += msg.Content
 						agentExecutor.PublishChunk(msg.Content)
 					}
+					if u := extractUsage(msg); u != nil {
+						usage = u
+					}
 				}
 			}
 		} else if mv.Message != nil {
@@ -144,6 +188,9 @@ func handleStreamingResultWithTools(
 			if mv.Message.Content != "" {
 				fullContent += mv.Message.Content
 				agentExecutor.PublishChunk(mv.Message.Content)
+			}
+			if u := extractUsage(mv.Message); u != nil {
+				usage = u
 			}
 		}
 	}

@@ -10,6 +10,7 @@ import (
 	apprepo "github.com/dysodeng/ai-adp/internal/infrastructure/persistence/repository/app"
 	modelrepo "github.com/dysodeng/ai-adp/internal/infrastructure/persistence/repository/model"
 	tenantrepo "github.com/dysodeng/ai-adp/internal/infrastructure/persistence/repository/tenant"
+	ihttp "github.com/dysodeng/ai-adp/internal/interfaces/http"
 	tenanthandler "github.com/dysodeng/ai-adp/internal/interfaces/http/handler"
 )
 
@@ -40,4 +41,5 @@ var ModulesSet = wire.NewSet(
 	AppModuleSet,
 	ModelModuleSet,
 	ChatModuleSet,
+	ihttp.NewRouter,
 )

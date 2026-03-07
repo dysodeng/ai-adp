@@ -23,6 +23,7 @@ func NewAgentBuilder(toolService port.ToolService) AgentBuilder {
 func (b *agentBuilderImpl) BuildAgentConfig(
 	ctx context.Context,
 	app *appModel.App,
+	version *appModel.AppVersion,
 	input map[string]any,
 	isStreaming bool,
 ) (*model.Config, error) {
@@ -39,6 +40,9 @@ func (b *agentBuilderImpl) BuildAgentConfig(
 		AgentDescription: app.Description(),
 		Type:             app.Type().String(),
 		IsStreaming:      isStreaming,
+		Prompt: &model.PromptConfig{
+			SystemPrompt: version.Config().SystemPrompt,
+		},
 		ToolsConfig: &model.ToolsConfig{
 			Enabled: len(tools) > 0,
 			Tools:   tools,

@@ -67,7 +67,7 @@ func (e *agentExecutorImpl) Start() {
 	defer e.mu.Unlock()
 	e.status = model.ExecutionStatusRunning
 	e.startTime = time.Now()
-	e.publishEvent(&model.Event{
+	e.broadcastEvent(&model.Event{
 		Type:      model.EventTypeStart,
 		Timestamp: time.Now(),
 	})
@@ -79,7 +79,7 @@ func (e *agentExecutorImpl) Complete(output *model.ExecutionOutput) {
 	e.status = model.ExecutionStatusCompleted
 	e.output = output
 	e.endTime = time.Now()
-	e.publishEvent(&model.Event{
+	e.broadcastEvent(&model.Event{
 		Type:      model.EventTypeComplete,
 		Timestamp: time.Now(),
 		Data:      output,
@@ -93,7 +93,7 @@ func (e *agentExecutorImpl) Fail(err error) {
 	e.status = model.ExecutionStatusFailed
 	e.err = err
 	e.endTime = time.Now()
-	e.publishEvent(&model.Event{
+	e.broadcastEvent(&model.Event{
 		Type:      model.EventTypeError,
 		Timestamp: time.Now(),
 		Data:      err,
@@ -116,7 +116,9 @@ func (e *agentExecutorImpl) Err() error {
 }
 
 func (e *agentExecutorImpl) PublishChunk(content string) {
-	e.publishEvent(&model.Event{
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+	e.broadcastEvent(&model.Event{
 		Type:      model.EventTypeChunk,
 		Timestamp: time.Now(),
 		Data:      content,
@@ -124,7 +126,9 @@ func (e *agentExecutorImpl) PublishChunk(content string) {
 }
 
 func (e *agentExecutorImpl) PublishThinking(content string) {
-	e.publishEvent(&model.Event{
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+	e.broadcastEvent(&model.Event{
 		Type:      model.EventTypeThinking,
 		Timestamp: time.Now(),
 		Data:      content,
@@ -132,7 +136,9 @@ func (e *agentExecutorImpl) PublishThinking(content string) {
 }
 
 func (e *agentExecutorImpl) PublishToolCall(toolCall *model.ToolCall) {
-	e.publishEvent(&model.Event{
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+	e.broadcastEvent(&model.Event{
 		Type:      model.EventTypeToolCall,
 		Timestamp: time.Now(),
 		Data:      toolCall,
@@ -140,7 +146,9 @@ func (e *agentExecutorImpl) PublishToolCall(toolCall *model.ToolCall) {
 }
 
 func (e *agentExecutorImpl) PublishToolStart(toolCall *model.ToolCall) {
-	e.publishEvent(&model.Event{
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+	e.broadcastEvent(&model.Event{
 		Type:      model.EventTypeToolStart,
 		Timestamp: time.Now(),
 		Data:      toolCall,
@@ -148,7 +156,9 @@ func (e *agentExecutorImpl) PublishToolStart(toolCall *model.ToolCall) {
 }
 
 func (e *agentExecutorImpl) PublishToolResult(toolResult *model.ToolResult) {
-	e.publishEvent(&model.Event{
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+	e.broadcastEvent(&model.Event{
 		Type:      model.EventTypeToolResult,
 		Timestamp: time.Now(),
 		Data:      toolResult,
@@ -156,7 +166,9 @@ func (e *agentExecutorImpl) PublishToolResult(toolResult *model.ToolResult) {
 }
 
 func (e *agentExecutorImpl) PublishToolError(toolCallID, toolName, errMsg string) {
-	e.publishEvent(&model.Event{
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+	e.broadcastEvent(&model.Event{
 		Type:      model.EventTypeToolError,
 		Timestamp: time.Now(),
 		Data: map[string]string{
@@ -168,7 +180,9 @@ func (e *agentExecutorImpl) PublishToolError(toolCallID, toolName, errMsg string
 }
 
 func (e *agentExecutorImpl) PublishMessage(message *model.Message) {
-	e.publishEvent(&model.Event{
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+	e.broadcastEvent(&model.Event{
 		Type:      model.EventTypeMessage,
 		Timestamp: time.Now(),
 		Data:      message,
@@ -176,7 +190,9 @@ func (e *agentExecutorImpl) PublishMessage(message *model.Message) {
 }
 
 func (e *agentExecutorImpl) PublishTokenUsage(usage *model.TokenUsage) {
-	e.publishEvent(&model.Event{
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+	e.broadcastEvent(&model.Event{
 		Type:      model.EventTypeTokenUsage,
 		Timestamp: time.Now(),
 		Data:      usage,
@@ -186,7 +202,40 @@ func (e *agentExecutorImpl) PublishTokenUsage(usage *model.TokenUsage) {
 func (e *agentExecutorImpl) Subscribe() <-chan *model.Event {
 	e.mu.Lock()
 	defer e.mu.Unlock()
+
 	ch := make(chan *model.Event, 100)
+
+	// 如果 executor 已经在运行，重放 start 事件
+	if e.status == model.ExecutionStatusRunning {
+		ch <- &model.Event{
+			Type:      model.EventTypeStart,
+			Timestamp: e.startTime,
+		}
+	}
+
+	// 如果 executor 已经结束，重放终止事件并立即关闭 channel，避免订阅者永久阻塞
+	switch e.status {
+	case model.ExecutionStatusCompleted:
+		ch <- &model.Event{
+			Type:      model.EventTypeComplete,
+			Timestamp: e.endTime,
+			Data:      e.output,
+		}
+		close(ch)
+		return ch
+	case model.ExecutionStatusFailed:
+		ch <- &model.Event{
+			Type:      model.EventTypeError,
+			Timestamp: e.endTime,
+			Data:      e.err,
+		}
+		close(ch)
+		return ch
+	case model.ExecutionStatusCancelled:
+		close(ch)
+		return ch
+	}
+
 	e.subscribers = append(e.subscribers, ch)
 	return ch
 }
@@ -224,10 +273,8 @@ func (e *agentExecutorImpl) GetOutput() *model.ExecutionOutput {
 	return e.output
 }
 
-// publishEvent 发布事件到所有订阅者
-func (e *agentExecutorImpl) publishEvent(event *model.Event) {
-	e.mu.RLock()
-	defer e.mu.RUnlock()
+// broadcastEvent 发布事件到所有订阅者（调用方必须已持有锁）
+func (e *agentExecutorImpl) broadcastEvent(event *model.Event) {
 	for _, ch := range e.subscribers {
 		select {
 		case ch <- event:
@@ -237,7 +284,7 @@ func (e *agentExecutorImpl) publishEvent(event *model.Event) {
 	}
 }
 
-// closeAllSubscribers 关闭所有订阅者的 channel
+// closeAllSubscribers 关闭所有订阅者的 channel（调用方必须已持有锁）
 func (e *agentExecutorImpl) closeAllSubscribers() {
 	for _, ch := range e.subscribers {
 		close(ch)

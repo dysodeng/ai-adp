@@ -10,13 +10,14 @@ import (
 	"github.com/dysodeng/ai-adp/internal/application/chat/orchestrator"
 	"github.com/dysodeng/ai-adp/internal/domain/agent/executor"
 	"github.com/dysodeng/ai-adp/internal/domain/agent/model"
+	appmodel "github.com/dysodeng/ai-adp/internal/domain/app/model"
 	"github.com/dysodeng/ai-adp/internal/domain/app/repository"
 )
 
 // ChatAppService Chat 应用服务接口
 type ChatAppService interface {
 	// Chat 执行 Agent 对话，返回 AgentExecutor 用于事件订阅
-	Chat(ctx context.Context, appID string, cmd chatdto.ChatCommand) (executor.AgentExecutor, error)
+	Chat(ctx context.Context, appAuthIden string, cmd chatdto.ChatCommand) (executor.AgentExecutor, error)
 }
 
 type chatAppService struct {
@@ -37,7 +38,7 @@ func NewChatAppService(
 
 func (svc *chatAppService) Chat(
 	ctx context.Context,
-	appID string,
+	appAuthIden string,
 	cmd chatdto.ChatCommand,
 ) (executor.AgentExecutor, error) {
 	// 1. 解析 conversation ID
@@ -57,12 +58,19 @@ func (svc *chatAppService) Chat(
 		return nil, fmt.Errorf("invalid response mode: %s", cmd.ResponseMode)
 	}
 
-	// 3. 加载 App
-	appUUID, err := uuid.Parse(appID)
-	if err != nil {
-		return nil, fmt.Errorf("invalid app ID: %w", err)
+	// 3. 加载 App 及已发布版本（优先解析为 UUID，否则当作 API Key）
+	appUUID, parseErr := uuid.Parse(appAuthIden)
+
+	var app *appmodel.App
+	var version *appmodel.AppVersion
+	var err error
+	if parseErr == nil {
+		// 通过 App ID 查找应用及已发布版本
+		app, version, err = svc.appRepository.FindAppWithPublishedVersion(ctx, appUUID)
+	} else {
+		// 通过 API Key 查找应用及已发布版本
+		app, version, err = svc.appRepository.FindAppByApiKey(ctx, appAuthIden)
 	}
-	app, err := svc.appRepository.FindAppByID(ctx, appUUID)
 	if err != nil {
 		return nil, fmt.Errorf("app not found: %w", err)
 	}
@@ -80,7 +88,7 @@ func (svc *chatAppService) Chat(
 	agentExecutor := executor.NewAgentExecutor(
 		ctx,
 		taskID,
-		appID,
+		app.ID().String(),
 		app.Type(),
 		conversationID,
 		messageID,
@@ -88,7 +96,7 @@ func (svc *chatAppService) Chat(
 	)
 
 	// 6. 通过编排器执行
-	if err = svc.orchestrator.Execute(ctx, app, agentExecutor, isStream); err != nil {
+	if err := svc.orchestrator.Execute(ctx, app, version, agentExecutor, isStream); err != nil {
 		return nil, err
 	}
 

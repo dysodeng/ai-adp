@@ -6,24 +6,38 @@ import "time"
 type EventType string
 
 const (
-	EventTypeStart      EventType = "start"
-	EventTypeChunk      EventType = "chunk"
-	EventTypeThinking   EventType = "thinking"
-	EventTypeToolCall   EventType = "tool_call"
-	EventTypeToolStart  EventType = "tool_start"
-	EventTypeToolResult EventType = "tool_result"
-	EventTypeToolError  EventType = "tool_error"
-	EventTypeMessage    EventType = "message"
-	EventTypeTokenUsage EventType = "token_usage"
-	EventTypeComplete   EventType = "complete"
-	EventTypeError      EventType = "error"
+	// 执行生命周期事件
+	EventTypeStart     EventType = "start"
+	EventTypeComplete  EventType = "complete"
+	EventTypeError     EventType = "error"
+	EventTypeCancelled EventType = "cancelled"
+
+	// 输出内容事件
+	EventTypeChunk    EventType = "chunk"
+	EventTypeThinking EventType = "thinking"
+
+	// 工具事件
+	EventTypeToolCall   EventType = "tool.call"
+	EventTypeToolStart  EventType = "tool.start"
+	EventTypeToolResult EventType = "tool.result"
+	EventTypeToolError  EventType = "tool.error"
+
+	// 消息事件
+	EventTypeMessage EventType = "message"
+
+	// 人工介入事件
+	EventTypeInterrupt EventType = "interrupt"
+	EventTypeResume    EventType = "resume"
+
+	// Token统计事件
+	EventTypeTokenUsage EventType = "token.usage"
 )
 
 // Event 领域事件
 type Event struct {
-	Type      EventType
-	Timestamp time.Time
-	Data      interface{}
+	Type      EventType   `json:"type"`
+	Timestamp time.Time   `json:"timestamp"`
+	Data      interface{} `json:"data,omitempty"`
 }
 
 // ExecutionInput 执行输入
@@ -35,40 +49,40 @@ type ExecutionInput struct {
 
 // ExecutionOutput 执行输出
 type ExecutionOutput struct {
-	Message *Message
-	Usage   *TokenUsage
+	Message *Message    `json:"message"`
+	Usage   *TokenUsage `json:"usage,omitempty"`
 }
 
 // Message 消息
 type Message struct {
-	Role    string
-	Content MessageContent
+	Role    string         `json:"role"`
+	Content MessageContent `json:"content"`
 }
 
 // MessageContent 消息内容
 type MessageContent struct {
-	Content string
+	Content string `json:"content"`
 }
 
 // ToolCall 工具调用
 type ToolCall struct {
-	ID       string
-	ToolName string
-	Input    map[string]interface{}
+	ID       string                 `json:"id"`
+	ToolName string                 `json:"tool_name"`
+	Input    map[string]interface{} `json:"input"`
 }
 
 // ToolResult 工具结果
 type ToolResult struct {
-	ToolCallID string
-	ToolName   string
-	Output     string
+	ToolCallID string `json:"tool_call_id"`
+	ToolName   string `json:"tool_name"`
+	Output     string `json:"output"`
 }
 
 // TokenUsage Token 使用量
 type TokenUsage struct {
-	InputTokens  int
-	OutputTokens int
-	TotalTokens  int
+	InputTokens  int `json:"input_tokens"`
+	OutputTokens int `json:"output_tokens"`
+	TotalTokens  int `json:"total_tokens"`
 }
 
 // ExecutionStatus 执行状态

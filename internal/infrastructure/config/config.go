@@ -1,6 +1,11 @@
 package config
 
-import "github.com/spf13/viper"
+import (
+	"strings"
+
+	"github.com/joho/godotenv"
+	"github.com/spf13/viper"
+)
 
 // Config 应用全局配置
 type Config struct {
@@ -16,7 +21,7 @@ type Config struct {
 // AppConfig 应用基础配置
 type AppConfig struct {
 	Name  string `mapstructure:"name"`
-	Env   string `mapstructure:"env"`   // development | production | test
+	Env   string `mapstructure:"env"` // development | production | test
 	Debug bool   `mapstructure:"debug"`
 }
 
@@ -76,10 +81,15 @@ type TracingConfig struct {
 	SampleRate  float64 `mapstructure:"sample_rate"`  // 采样率 0.0-1.0，默认 1.0
 }
 
-// Load 从文件加载配置，支持环境变量覆盖
+// Load 从文件加载配置，支持 .env 文件和环境变量覆盖
 func Load(path string) (*Config, error) {
+	// 加载 .env 文件到进程环境变量（文件不存在则忽略）
+	_ = godotenv.Load()
+
 	v := viper.New()
 	v.SetConfigFile(path)
+	// 将环境变量中的 _ 映射为 .，如 DATABASE_HOST -> database.host
+	v.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 	v.AutomaticEnv()
 
 	// 设置默认值
@@ -88,11 +98,44 @@ func Load(path string) (*Config, error) {
 	if err := v.ReadInConfig(); err != nil {
 		return nil, err
 	}
+
+	// 显式绑定所有需要从环境变量覆盖的配置项
+	bindEnvKeys(v)
+
 	var cfg Config
 	if err := v.Unmarshal(&cfg); err != nil {
 		return nil, err
 	}
 	return &cfg, nil
+}
+
+// bindEnvKeys 显式绑定环境变量键到 viper 配置键
+func bindEnvKeys(v *viper.Viper) {
+	envBindings := map[string]string{
+		"app.env":              "APP_ENV",
+		"app.debug":            "APP_DEBUG",
+		"database.host":        "DATABASE_HOST",
+		"database.port":        "DATABASE_PORT",
+		"database.name":        "DATABASE_NAME",
+		"database.user":        "DATABASE_USER",
+		"database.password":    "DATABASE_PASSWORD",
+		"database.ssl_mode":    "DATABASE_SSL_MODE",
+		"redis.addr":           "REDIS_ADDR",
+		"redis.password":       "REDIS_PASSWORD",
+		"redis.db":             "REDIS_DB",
+		"jwt.secret":           "JWT_SECRET",
+		"tracing.enabled":      "TRACING_ENABLED",
+		"tracing.endpoint":     "TRACING_ENDPOINT",
+		"tracing.service_name": "TRACING_SERVICE_NAME",
+		"tracing.sample_rate":  "TRACING_SAMPLE_RATE",
+		"server.http.port":     "SERVER_HTTP_PORT",
+		"logger.level":         "LOGGER_LEVEL",
+		"logger.format":        "LOGGER_FORMAT",
+		"logger.output_path":   "LOGGER_OUTPUT_PATH",
+	}
+	for key, env := range envBindings {
+		v.BindEnv(key, env)
+	}
 }
 
 func setDefaults(v *viper.Viper) {

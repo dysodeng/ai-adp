@@ -15,7 +15,7 @@ import (
 // ExecutorOrchestrator Agent 执行编排器
 type ExecutorOrchestrator interface {
 	// Execute 执行 Agent（非阻塞），通过 AgentExecutor 事件流获取结果
-	Execute(ctx context.Context, app *appmodel.App, agentExecutor executor.AgentExecutor, isStreaming bool) error
+	Execute(ctx context.Context, app *appmodel.App, version *appmodel.AppVersion, agentExecutor executor.AgentExecutor, isStreaming bool) error
 }
 
 type executorOrchestrator struct {
@@ -37,23 +37,34 @@ func NewExecutorOrchestrator(
 func (o *executorOrchestrator) Execute(
 	ctx context.Context,
 	app *appmodel.App,
+	version *appmodel.AppVersion,
 	agentExecutor executor.AgentExecutor,
 	isStreaming bool,
 ) error {
+	logger.Info(ctx, "[orchestrator] Execute start",
+		logger.AddField("appID", app.ID().String()),
+		logger.AddField("modelID", version.Config().ModelID.String()),
+		logger.AddField("isStreaming", isStreaming),
+	)
+
 	// 1. 构建 Agent 配置
-	config, err := o.agentBuilder.BuildAgentConfig(ctx, app, agentExecutor.GetInput().Variables, isStreaming)
+	config, err := o.agentBuilder.BuildAgentConfig(ctx, app, version, agentExecutor.GetInput().Variables, isStreaming)
 	if err != nil {
 		return fmt.Errorf("build agent config failed: %w", err)
 	}
+	logger.Info(ctx, "[orchestrator] BuildAgentConfig done")
 
-	// 2. 通过工厂创建 Agent（modelID 存储在 config.AgentID 中，即 appID，后续可从 AppConfig 中获取）
-	ag, err := o.agentFactory.CreateAgent(ctx, app.Type(), config, config.AgentID)
+	// 2. 通过工厂创建 Agent，使用 version 中的 ModelID
+	modelID := version.Config().ModelID.String()
+	ag, err := o.agentFactory.CreateAgent(ctx, app.Type(), config, modelID)
 	if err != nil {
 		return fmt.Errorf("create agent failed: %w", err)
 	}
+	logger.Info(ctx, "[orchestrator] CreateAgent done")
 
 	// 3. 启动执行
 	agentExecutor.Start()
+	logger.Info(ctx, "[orchestrator] agentExecutor.Start() done, launching goroutine")
 
 	// 4. 异步执行 Agent
 	go o.executeAgent(ctx, ag, agentExecutor)
@@ -69,20 +80,25 @@ func (o *executorOrchestrator) Execute(
 		}
 	}
 
+	logger.Info(ctx, "[orchestrator] Execute returning")
 	return nil
 }
 
 func (o *executorOrchestrator) executeAgent(ctx context.Context, ag domainagent.Agent, agentExecutor executor.AgentExecutor) {
+	logger.Info(ctx, "[orchestrator] executeAgent goroutine started")
 	defer func() {
 		if r := recover(); r != nil {
 			err := fmt.Errorf("agent execution panic: %v", r)
-			logger.Error(ctx, "agent execution panic", logger.ErrorField(err))
+			logger.Error(ctx, "[orchestrator] agent execution panic", logger.ErrorField(err))
 			agentExecutor.Fail(err)
 		}
 	}()
 
+	logger.Info(ctx, "[orchestrator] calling ag.Execute ...")
 	if err := ag.Execute(ctx, agentExecutor); err != nil {
-		logger.Error(ctx, "agent execution failed", logger.ErrorField(err))
+		logger.Error(ctx, "[orchestrator] ag.Execute failed", logger.ErrorField(err))
+		agentExecutor.Fail(err)
 		return
 	}
+	logger.Info(ctx, "[orchestrator] ag.Execute completed successfully")
 }

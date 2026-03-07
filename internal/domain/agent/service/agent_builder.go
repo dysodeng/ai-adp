@@ -16,6 +16,7 @@ type AgentBuilder interface {
 	BuildAgentConfig(
 		ctx context.Context,
 		app *appModel.App,
+		version *appModel.AppVersion,
 		input map[string]any,
 		isStreaming bool,
 	) (*model.Config, error)

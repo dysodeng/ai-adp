@@ -16,7 +16,7 @@ import (
 // NewChatModel 根据 ModelConfig 创建对应 Provider 的 Eino ToolCallingChatModel
 func NewChatModel(ctx context.Context, m *modelconfig.ModelConfig) (einomodel.ToolCallingChatModel, error) {
 	switch m.Provider() {
-	case "openai", "openai_compatible":
+	case "openai", "openai_compatible", "siliconflow":
 		cfg := &openai.ChatModelConfig{
 			APIKey: m.APIKey(),
 			Model:  m.ModelID(),

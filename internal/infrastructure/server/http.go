@@ -12,8 +12,7 @@ import (
 
 	"github.com/dysodeng/ai-adp/internal/infrastructure/config"
 	"github.com/dysodeng/ai-adp/internal/infrastructure/logger"
-	"github.com/dysodeng/ai-adp/internal/interfaces/http/handler"
-	"github.com/dysodeng/ai-adp/internal/interfaces/http/middleware"
+	ihttp "github.com/dysodeng/ai-adp/internal/interfaces/http"
 )
 
 // compile-time check
@@ -21,15 +20,14 @@ var _ Server = (*HTTPServer)(nil)
 
 // HTTPServer HTTP 服务器，实现 Server 接口
 type HTTPServer struct {
-	cfg           *config.Config
-	mu            sync.Mutex
-	server        *http.Server
-	tenantHandler *handler.TenantHandler
-	chatHandler   *handler.ChatHandler
+	cfg    *config.Config
+	mu     sync.Mutex
+	server *http.Server
+	router *ihttp.Router
 }
 
-func NewHTTPServer(cfg *config.Config, tenantHandler *handler.TenantHandler, chatHandler *handler.ChatHandler) *HTTPServer {
-	return &HTTPServer{cfg: cfg, tenantHandler: tenantHandler, chatHandler: chatHandler}
+func NewHTTPServer(cfg *config.Config, router *ihttp.Router) *HTTPServer {
+	return &HTTPServer{cfg: cfg, router: router}
 }
 
 func (s *HTTPServer) IsEnabled() bool { return true }
@@ -45,17 +43,7 @@ func (s *HTTPServer) Start() error {
 	}
 
 	r := gin.New()
-	r.Use(
-		middleware.Recovery(),
-		middleware.Tracing(s.cfg.App.Name),
-		middleware.Logger(),
-		middleware.RequestID(),
-	)
-
-	r.GET("/health", handler.HealthCheck)
-	v1 := r.Group("/api/v1")
-	s.tenantHandler.RegisterRoutes(v1)
-	s.chatHandler.RegisterRoutes(v1)
+	s.router.Setup(r, s.cfg.App.Name)
 
 	// 同步绑定端口，立即暴露 bind 错误
 	ln, err := net.Listen("tcp", s.Addr())

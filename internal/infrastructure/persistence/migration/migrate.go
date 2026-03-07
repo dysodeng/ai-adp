@@ -14,5 +14,6 @@ func AutoMigrate(db *gorm.DB) error {
 		&entity.ModelConfigEntity{},
 		&entity.AppEntity{},
 		&entity.AppVersionEntity{},
+		&entity.AppApiKeyEntity{},
 	)
 }

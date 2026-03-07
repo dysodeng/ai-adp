@@ -7,17 +7,18 @@
 package di
 
 import (
-	chatorch "github.com/dysodeng/ai-adp/internal/application/chat/orchestrator"
-	chatservice "github.com/dysodeng/ai-adp/internal/application/chat/service"
+	"github.com/dysodeng/ai-adp/internal/application/chat/orchestrator"
+	service3 "github.com/dysodeng/ai-adp/internal/application/chat/service"
 	"github.com/dysodeng/ai-adp/internal/application/tenant/service"
 	service2 "github.com/dysodeng/ai-adp/internal/domain/agent/service"
 	"github.com/dysodeng/ai-adp/internal/domain/shared/port"
 	"github.com/dysodeng/ai-adp/internal/infrastructure/ai/engine"
 	"github.com/dysodeng/ai-adp/internal/infrastructure/config"
 	"github.com/dysodeng/ai-adp/internal/infrastructure/persistence/repository/app"
-	modelrepo "github.com/dysodeng/ai-adp/internal/infrastructure/persistence/repository/model"
+	"github.com/dysodeng/ai-adp/internal/infrastructure/persistence/repository/model"
 	"github.com/dysodeng/ai-adp/internal/infrastructure/persistence/repository/tenant"
 	"github.com/dysodeng/ai-adp/internal/infrastructure/server"
+	"github.com/dysodeng/ai-adp/internal/interfaces/http"
 	"github.com/dysodeng/ai-adp/internal/interfaces/http/handler"
 )
 
@@ -35,8 +36,17 @@ func InitApp(configPath string) (*App, error) {
 	tenantRepositoryImpl := tenant.NewTenantRepository(db)
 	tenantAppService := service.NewTenantAppService(tenantRepositoryImpl)
 	tenantHandler := handler.NewTenantHandler(tenantAppService)
-	executorFactory := engine.NewExecutorFactory()
+	toolService := port.NewMockToolService()
+	agentBuilder := service2.NewAgentBuilder(toolService)
+	modelConfigRepositoryImpl := model.NewModelConfigRepository(db)
+	agentFactory := provideAgentFactory(modelConfigRepositoryImpl)
+	executorOrchestrator := orchestrator.NewExecutorOrchestrator(agentBuilder, agentFactory)
 	appRepositoryImpl := app.NewAppRepository(db)
+	chatAppService := service3.NewChatAppService(executorOrchestrator, appRepositoryImpl)
+	chatHandler := handler.NewChatHandler(chatAppService)
+	router := http.NewRouter(tenantHandler, chatHandler)
+	httpServer := server.NewHTTPServer(configConfig, router)
+	executorFactory := engine.NewExecutorFactory()
 	logger, err := provideLogger(configConfig)
 	if err != nil {
 		return nil, err
@@ -45,15 +55,6 @@ func InitApp(configPath string) (*App, error) {
 	if err != nil {
 		return nil, err
 	}
-	toolService := port.NewMockToolService()
-	agentBuilder := service2.NewAgentBuilder(toolService)
-	modelConfigRepositoryImpl := modelrepo.NewModelConfigRepository(db)
-	agentFactory := provideAgentFactory(modelConfigRepositoryImpl)
-	// Chat module
-	executorOrchestrator := chatorch.NewExecutorOrchestrator(agentBuilder, agentFactory)
-	chatAppService := chatservice.NewChatAppService(executorOrchestrator, appRepositoryImpl)
-	chatHandler := handler.NewChatHandler(chatAppService)
-	httpServer := server.NewHTTPServer(configConfig, tenantHandler, chatHandler)
 	diApp := NewApp(httpServer, executorFactory, appRepositoryImpl, logger, shutdownFunc, toolService, agentBuilder, agentFactory)
 	return diApp, nil
 }

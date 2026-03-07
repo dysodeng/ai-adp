@@ -133,6 +133,107 @@ func (r *AppRepositoryImpl) FindVersionsByStatus(ctx context.Context, appID uuid
 	return toVersionDomainList(entities)
 }
 
+func (r *AppRepositoryImpl) SaveApiKey(ctx context.Context, apiKey *appmodel.AppApiKey) error {
+	e := toApiKeyEntity(apiKey)
+	return r.db.WithContext(ctx).Save(&e).Error
+}
+
+func (r *AppRepositoryImpl) FindApiKeyByKey(ctx context.Context, key string) (*appmodel.AppApiKey, error) {
+	var e entity.AppApiKeyEntity
+	err := r.db.WithContext(ctx).
+		Where("api_key = ? AND is_active = ?", key, true).
+		First(&e).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, apperrors.ErrApiKeyNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	return toApiKeyDomain(&e), nil
+}
+
+func (r *AppRepositoryImpl) FindApiKeysByApp(ctx context.Context, appID uuid.UUID) ([]*appmodel.AppApiKey, error) {
+	var entities []entity.AppApiKeyEntity
+	err := r.db.WithContext(ctx).
+		Where("app_id = ?", appID).
+		Order("created_at DESC").
+		Find(&entities).Error
+	if err != nil {
+		return nil, err
+	}
+	result := make([]*appmodel.AppApiKey, len(entities))
+	for i := range entities {
+		result[i] = toApiKeyDomain(&entities[i])
+	}
+	return result, nil
+}
+
+func (r *AppRepositoryImpl) DeleteApiKey(ctx context.Context, id uuid.UUID) error {
+	return r.db.WithContext(ctx).Delete(&entity.AppApiKeyEntity{}, "id = ?", id).Error
+}
+
+func (r *AppRepositoryImpl) FindAppWithPublishedVersion(ctx context.Context, appID uuid.UUID) (*appmodel.App, *appmodel.AppVersion, error) {
+	var appEntity entity.AppEntity
+	err := r.db.WithContext(ctx).First(&appEntity, "id = ?", appID).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, nil, apperrors.ErrAppNotFound
+	}
+	if err != nil {
+		return nil, nil, err
+	}
+
+	var versionEntity entity.AppVersionEntity
+	err = r.db.WithContext(ctx).
+		Where("app_id = ? AND status = ?", appID, valueobject.VersionStatusPublished).
+		First(&versionEntity).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, nil, apperrors.ErrNoPublishedVersion
+	}
+	if err != nil {
+		return nil, nil, err
+	}
+
+	app := toAppDomain(&appEntity)
+	version, err := toVersionDomain(&versionEntity)
+	if err != nil {
+		return nil, nil, err
+	}
+	return app, version, nil
+}
+
+func (r *AppRepositoryImpl) FindAppByApiKey(ctx context.Context, key string) (*appmodel.App, *appmodel.AppVersion, error) {
+	var apiKeyEntity entity.AppApiKeyEntity
+	err := r.db.WithContext(ctx).
+		Where("api_key = ? AND is_active = ?", key, true).
+		First(&apiKeyEntity).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, nil, apperrors.ErrApiKeyNotFound
+	}
+	if err != nil {
+		return nil, nil, err
+	}
+
+	appID, _ := uuid.Parse(apiKeyEntity.AppID)
+	return r.FindAppWithPublishedVersion(ctx, appID)
+}
+
+func toApiKeyEntity(k *appmodel.AppApiKey) entity.AppApiKeyEntity {
+	e := entity.AppApiKeyEntity{
+		AppID:       k.AppID().String(),
+		ApiKey:      k.ApiKey(),
+		Description: k.Description(),
+		IsActive:    k.IsActive(),
+		LastUsedAt:  k.LastUsedAt(),
+	}
+	e.ID = k.ID()
+	return e
+}
+
+func toApiKeyDomain(e *entity.AppApiKeyEntity) *appmodel.AppApiKey {
+	appID, _ := uuid.Parse(e.AppID)
+	return appmodel.ReconstituteAppApiKey(e.ID, appID, e.ApiKey, e.Description, e.IsActive, e.LastUsedAt, e.CreatedAt)
+}
+
 func toAppEntity(a *appmodel.App) entity.AppEntity {
 	e := entity.AppEntity{
 		TenantID:    a.TenantID().String(),

@@ -3,9 +3,9 @@ package handler
 import (
 	"net/http"
 
-	"github.com/gin-gonic/gin"
 	"github.com/dysodeng/ai-adp/internal/application/tenant/dto"
 	"github.com/dysodeng/ai-adp/internal/application/tenant/service"
+	"github.com/gin-gonic/gin"
 )
 
 type TenantHandler struct {
@@ -58,13 +58,4 @@ func (h *TenantHandler) Delete(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusNoContent, nil)
-}
-
-// RegisterRoutes registers all tenant routes on the given RouterGroup
-func (h *TenantHandler) RegisterRoutes(rg *gin.RouterGroup) {
-	tenants := rg.Group("/tenants")
-	tenants.POST("", h.Create)
-	tenants.GET("", h.List)
-	tenants.GET("/:id", h.GetByID)
-	tenants.DELETE("/:id", h.Delete)
 }
