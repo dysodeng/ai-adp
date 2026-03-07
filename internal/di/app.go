@@ -9,8 +9,7 @@ import (
 	agentservice "github.com/dysodeng/ai-adp/internal/domain/agent/service"
 	appdomainrepo "github.com/dysodeng/ai-adp/internal/domain/app/repository"
 	"github.com/dysodeng/ai-adp/internal/domain/shared/port"
-	"github.com/dysodeng/ai-adp/internal/infrastructure/ai/adapter"
-	"github.com/dysodeng/ai-adp/internal/infrastructure/ai/engine"
+	infraagent "github.com/dysodeng/ai-adp/internal/infrastructure/agent"
 	"github.com/dysodeng/ai-adp/internal/infrastructure/logger"
 	"github.com/dysodeng/ai-adp/internal/infrastructure/server"
 	"github.com/dysodeng/ai-adp/internal/infrastructure/telemetry"
@@ -27,14 +26,12 @@ type App struct {
 // NewApp 构造 App。_ *zap.Logger 确保 Wire 在构建 App 前初始化全局 logger（顺序依赖）。
 func NewApp(
 	httpServer *server.HTTPServer,
-	_ *engine.ExecutorFactory,
 	_ appdomainrepo.AppRepository,
 	_ *zap.Logger,
 	tracerShutdown telemetry.ShutdownFunc,
-	// 新架构组件
 	_ port.ToolService,
 	_ agentservice.AgentBuilder,
-	_ *adapter.AgentFactory,
+	_ *infraagent.AgentFactory,
 	// 取消能力组件
 	cancelBroadcaster executor.CancelBroadcaster,
 	taskRegistry executor.TaskRegistry,

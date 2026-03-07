@@ -1,4 +1,4 @@
-package adapter
+package agent
 
 import (
 	"context"
@@ -13,7 +13,6 @@ import (
 	"github.com/dysodeng/ai-adp/internal/domain/agent/tool"
 	"github.com/dysodeng/ai-adp/internal/domain/app/valueobject"
 	modelconfig "github.com/dysodeng/ai-adp/internal/domain/model/model"
-	"github.com/dysodeng/ai-adp/internal/infrastructure/ai/engine"
 )
 
 // TextCompletionAgent 文本生成 Agent 适配器（纯技术实现）
@@ -27,7 +26,7 @@ func NewTextCompletionAgent(
 	config *model.Config,
 	modelConfig *modelconfig.ModelConfig,
 ) (agent.Agent, error) {
-	chatModel, err := engine.NewChatModel(ctx, modelConfig)
+	chatModel, err := NewChatModel(ctx, modelConfig)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create chat model: %w", err)
 	}

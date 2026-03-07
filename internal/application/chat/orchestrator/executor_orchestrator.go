@@ -9,7 +9,7 @@ import (
 	"github.com/dysodeng/ai-adp/internal/domain/agent/executor"
 	"github.com/dysodeng/ai-adp/internal/domain/agent/service"
 	appmodel "github.com/dysodeng/ai-adp/internal/domain/app/model"
-	"github.com/dysodeng/ai-adp/internal/infrastructure/ai/adapter"
+	infraagent "github.com/dysodeng/ai-adp/internal/infrastructure/agent"
 	"github.com/dysodeng/ai-adp/internal/infrastructure/logger"
 )
 
@@ -21,14 +21,14 @@ type ExecutorOrchestrator interface {
 
 type executorOrchestrator struct {
 	agentBuilder service.AgentBuilder
-	agentFactory *adapter.AgentFactory
+	agentFactory *infraagent.AgentFactory
 	taskRegistry executor.TaskRegistry
 }
 
 // NewExecutorOrchestrator 创建执行编排器
 func NewExecutorOrchestrator(
 	agentBuilder service.AgentBuilder,
-	agentFactory *adapter.AgentFactory,
+	agentFactory *infraagent.AgentFactory,
 	taskRegistry executor.TaskRegistry,
 ) ExecutorOrchestrator {
 	return &executorOrchestrator{

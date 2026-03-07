@@ -13,7 +13,6 @@ import (
 	service2 "github.com/dysodeng/ai-adp/internal/domain/agent/service"
 	"github.com/dysodeng/ai-adp/internal/domain/shared/port"
 	"github.com/dysodeng/ai-adp/internal/infrastructure/agent"
-	"github.com/dysodeng/ai-adp/internal/infrastructure/ai/engine"
 	"github.com/dysodeng/ai-adp/internal/infrastructure/cache"
 	"github.com/dysodeng/ai-adp/internal/infrastructure/config"
 	"github.com/dysodeng/ai-adp/internal/infrastructure/persistence/repository/app"
@@ -52,7 +51,6 @@ func InitApp(configPath string) (*App, error) {
 	cancelHandler := handler.NewCancelHandler(memoryTaskRegistry, redisCancelBroadcaster)
 	router := http.NewRouter(tenantHandler, chatHandler, cancelHandler)
 	httpServer := server.NewHTTPServer(configConfig, router)
-	executorFactory := engine.NewExecutorFactory()
 	logger, err := provideLogger(configConfig)
 	if err != nil {
 		return nil, err
@@ -61,6 +59,6 @@ func InitApp(configPath string) (*App, error) {
 	if err != nil {
 		return nil, err
 	}
-	diApp := NewApp(httpServer, executorFactory, appRepositoryImpl, logger, shutdownFunc, toolService, agentBuilder, agentFactory, redisCancelBroadcaster, memoryTaskRegistry)
+	diApp := NewApp(httpServer, appRepositoryImpl, logger, shutdownFunc, toolService, agentBuilder, agentFactory, redisCancelBroadcaster, memoryTaskRegistry)
 	return diApp, nil
 }

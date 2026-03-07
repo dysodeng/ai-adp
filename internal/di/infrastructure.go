@@ -12,8 +12,6 @@ import (
 	modeldomainrepo "github.com/dysodeng/ai-adp/internal/domain/model/repository"
 	"github.com/dysodeng/ai-adp/internal/domain/shared/port"
 	infraagent "github.com/dysodeng/ai-adp/internal/infrastructure/agent"
-	"github.com/dysodeng/ai-adp/internal/infrastructure/ai/adapter"
-	"github.com/dysodeng/ai-adp/internal/infrastructure/ai/engine"
 	"github.com/dysodeng/ai-adp/internal/infrastructure/cache"
 	"github.com/dysodeng/ai-adp/internal/infrastructure/config"
 	"github.com/dysodeng/ai-adp/internal/infrastructure/logger"
@@ -32,8 +30,6 @@ var InfrastructureSet = wire.NewSet(
 	server.NewHTTPServer,
 	provideLogger,
 	provideTracerShutdown,
-	engine.NewExecutorFactory, // AI 引擎工厂（旧）
-	// 新架构组件
 	port.NewMockToolService,
 	agentservice.NewAgentBuilder,
 	provideAgentFactory,
@@ -72,6 +68,6 @@ func provideTracerShutdown(cfg *config.Config) (telemetry.ShutdownFunc, error) {
 }
 
 // provideAgentFactory 提供 AgentFactory
-func provideAgentFactory(modelConfigRepo modeldomainrepo.ModelConfigRepository) *adapter.AgentFactory {
-	return adapter.NewAgentFactory(modelConfigRepo)
+func provideAgentFactory(modelConfigRepo modeldomainrepo.ModelConfigRepository) *infraagent.AgentFactory {
+	return infraagent.NewAgentFactory(modelConfigRepo)
 }

@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	embeddinginfra "github.com/dysodeng/ai-adp/internal/infrastructure/ai/embedding"
+	embeddinginfra "github.com/dysodeng/ai-adp/internal/infrastructure/agent/embedding"
 )
 
 // stubEmbedder 实现 eino embedding.Embedder 接口（不发网络请求）

@@ -1,4 +1,4 @@
-package adapter
+package agent
 
 import (
 	"context"
@@ -13,7 +13,6 @@ import (
 	"github.com/dysodeng/ai-adp/internal/domain/agent/tool"
 	"github.com/dysodeng/ai-adp/internal/domain/app/valueobject"
 	modelconfig "github.com/dysodeng/ai-adp/internal/domain/model/model"
-	"github.com/dysodeng/ai-adp/internal/infrastructure/ai/engine"
 )
 
 // ReActAgent ReAct Agent 适配器（支持工具调用）
@@ -27,7 +26,7 @@ func NewReActAgent(
 	config *model.Config,
 	modelConfig *modelconfig.ModelConfig,
 ) (agent.Agent, error) {
-	chatModel, err := engine.NewChatModel(ctx, modelConfig)
+	chatModel, err := NewChatModel(ctx, modelConfig)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create chat model: %w", err)
 	}
