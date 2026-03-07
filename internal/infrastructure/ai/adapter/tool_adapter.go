@@ -7,6 +7,7 @@ import (
 
 	einotool "github.com/cloudwego/eino/components/tool"
 	"github.com/cloudwego/eino/schema"
+	"github.com/eino-contrib/jsonschema"
 
 	domainTool "github.com/dysodeng/ai-adp/internal/domain/agent/tool"
 )
@@ -21,11 +22,28 @@ func NewToolAdapter(t domainTool.Tool) einotool.InvokableTool {
 }
 
 func (a *ToolAdapter) Info(ctx context.Context) (*schema.ToolInfo, error) {
-	// TODO: 正确转换 InputSchema 为 schema.ParamsOneOf
+	inputSchema := a.domainTool.InputSchema()
+
+	var paramsOneOf *schema.ParamsOneOf
+	if inputSchema != nil {
+		// 将 map[string]interface{} 转换为 jsonschema.Schema
+		jsonSchemaBytes, err := json.Marshal(inputSchema)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal input schema: %w", err)
+		}
+
+		var jsonSchemaObj jsonschema.Schema
+		if err := json.Unmarshal(jsonSchemaBytes, &jsonSchemaObj); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal to jsonschema.Schema: %w", err)
+		}
+
+		paramsOneOf = schema.NewParamsOneOfByJSONSchema(&jsonSchemaObj)
+	}
+
 	return &schema.ToolInfo{
 		Name:        a.domainTool.Name(),
 		Desc:        a.domainTool.Description(),
-		ParamsOneOf: nil, // TODO: 转换 InputSchema
+		ParamsOneOf: paramsOneOf,
 	}, nil
 }
 

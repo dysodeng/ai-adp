@@ -8,6 +8,7 @@ import (
 	"gorm.io/gorm"
 
 	agentservice "github.com/dysodeng/ai-adp/internal/domain/agent/service"
+	modeldomainrepo "github.com/dysodeng/ai-adp/internal/domain/model/repository"
 	"github.com/dysodeng/ai-adp/internal/domain/shared/port"
 	"github.com/dysodeng/ai-adp/internal/infrastructure/ai/adapter"
 	"github.com/dysodeng/ai-adp/internal/infrastructure/ai/engine"
@@ -64,7 +65,6 @@ func provideTracerShutdown(cfg *config.Config) (telemetry.ShutdownFunc, error) {
 }
 
 // provideAgentFactory 提供 AgentFactory
-// TODO: 实现 modelConfigGetter，目前返回 nil 作为占位
-func provideAgentFactory() *adapter.AgentFactory {
-	return adapter.NewAgentFactory(nil)
+func provideAgentFactory(modelConfigRepo modeldomainrepo.ModelConfigRepository) *adapter.AgentFactory {
+	return adapter.NewAgentFactory(modelConfigRepo)
 }

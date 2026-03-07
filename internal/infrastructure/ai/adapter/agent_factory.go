@@ -4,21 +4,23 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/google/uuid"
+
 	"github.com/dysodeng/ai-adp/internal/domain/agent/agent"
 	"github.com/dysodeng/ai-adp/internal/domain/agent/model"
 	"github.com/dysodeng/ai-adp/internal/domain/app/valueobject"
-	modelconfig "github.com/dysodeng/ai-adp/internal/domain/model/model"
+	modelrepo "github.com/dysodeng/ai-adp/internal/domain/model/repository"
 )
 
 // AgentFactory Agent 工厂（基础设施层）
 // 根据配置和 AppType 创建具体的 Agent 实现
 type AgentFactory struct {
-	modelConfigGetter func(ctx context.Context, modelID string) (*modelconfig.ModelConfig, error)
+	modelConfigRepo modelrepo.ModelConfigRepository
 }
 
-func NewAgentFactory(modelConfigGetter func(ctx context.Context, modelID string) (*modelconfig.ModelConfig, error)) *AgentFactory {
+func NewAgentFactory(modelConfigRepo modelrepo.ModelConfigRepository) *AgentFactory {
 	return &AgentFactory{
-		modelConfigGetter: modelConfigGetter,
+		modelConfigRepo: modelConfigRepo,
 	}
 }
 
@@ -30,9 +32,17 @@ func (f *AgentFactory) CreateAgent(
 	modelID string,
 ) (agent.Agent, error) {
 	// 加载模型配置
-	modelConfig, err := f.modelConfigGetter(ctx, modelID)
+	modelUUID, err := uuid.Parse(modelID)
+	if err != nil {
+		return nil, fmt.Errorf("invalid model ID: %w", err)
+	}
+
+	modelConfig, err := f.modelConfigRepo.FindByID(ctx, modelUUID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load model config: %w", err)
+	}
+	if modelConfig == nil {
+		return nil, fmt.Errorf("model config not found: %s", modelID)
 	}
 
 	// 根据 AppType 创建对应的 Agent

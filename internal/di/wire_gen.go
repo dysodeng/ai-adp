@@ -13,6 +13,7 @@ import (
 	"github.com/dysodeng/ai-adp/internal/infrastructure/ai/engine"
 	"github.com/dysodeng/ai-adp/internal/infrastructure/config"
 	"github.com/dysodeng/ai-adp/internal/infrastructure/persistence/repository/app"
+	modelrepo "github.com/dysodeng/ai-adp/internal/infrastructure/persistence/repository/model"
 	"github.com/dysodeng/ai-adp/internal/infrastructure/persistence/repository/tenant"
 	"github.com/dysodeng/ai-adp/internal/infrastructure/server"
 	"github.com/dysodeng/ai-adp/internal/interfaces/http/handler"
@@ -45,7 +46,8 @@ func InitApp(configPath string) (*App, error) {
 	}
 	toolService := port.NewMockToolService()
 	agentBuilder := service2.NewAgentBuilder(toolService)
-	agentFactory := provideAgentFactory()
+	modelConfigRepositoryImpl := modelrepo.NewModelConfigRepository(db)
+	agentFactory := provideAgentFactory(modelConfigRepositoryImpl)
 	diApp := NewApp(httpServer, executorFactory, appRepositoryImpl, logger, shutdownFunc, toolService, agentBuilder, agentFactory)
 	return diApp, nil
 }

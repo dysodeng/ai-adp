@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/cloudwego/eino/adk"
+	"github.com/cloudwego/eino/schema"
 
 	"github.com/dysodeng/ai-adp/internal/domain/agent/agent"
 	"github.com/dysodeng/ai-adp/internal/domain/agent/executor"
@@ -26,13 +27,11 @@ func NewTextCompletionAgent(
 	config *model.Config,
 	modelConfig *modelconfig.ModelConfig,
 ) (agent.Agent, error) {
-	// 使用现有的 engine.NewChatModel 创建模型
 	chatModel, err := engine.NewChatModel(ctx, modelConfig)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create chat model: %w", err)
 	}
 
-	// 创建 ADK Agent（不配置工具）
 	adkAgent, err := adk.NewChatModelAgent(ctx, &adk.ChatModelAgentConfig{
 		Name:        config.AgentName,
 		Description: config.AgentDescription,
@@ -50,8 +49,20 @@ func NewTextCompletionAgent(
 }
 
 func (a *TextCompletionAgent) Execute(ctx context.Context, agentExecutor executor.AgentExecutor) error {
-	// TODO: 实现执行逻辑，需要了解 ADK Agent 的正确 API
-	return fmt.Errorf("not implemented yet")
+	input := agentExecutor.GetInput()
+
+	messages := buildInputMessages(&input)
+	if a.config.Prompt.SystemPrompt != "" {
+		messages = prependSystemMessage(a.config.Prompt.SystemPrompt, messages)
+	}
+
+	runner := adk.NewRunner(ctx, adk.RunnerConfig{
+		Agent:           a.adkAgent,
+		EnableStreaming: true,
+	})
+	iter := runner.Run(ctx, messages)
+
+	return handleStreamingResult(iter, agentExecutor)
 }
 
 func (a *TextCompletionAgent) GetID() string          { return a.config.AgentID }
@@ -62,3 +73,28 @@ func (a *TextCompletionAgent) GetAppType() valueobject.AppType {
 }
 func (a *TextCompletionAgent) GetTools() []tool.Tool                          { return a.config.ToolsConfig.Tools }
 func (a *TextCompletionAgent) Validate(executor executor.AgentExecutor) error { return nil }
+
+// buildInputMessages 将 ExecutionInput 转换为 Eino Messages（不含 system prompt）
+func buildInputMessages(input *model.ExecutionInput) []*schema.Message {
+	messages := make([]*schema.Message, 0, len(input.History)+1)
+	for _, m := range input.History {
+		switch m.Role {
+		case "system":
+			messages = append(messages, schema.SystemMessage(m.Content.Content))
+		case "assistant":
+			messages = append(messages, schema.AssistantMessage(m.Content.Content, nil))
+		default:
+			messages = append(messages, schema.UserMessage(m.Content.Content))
+		}
+	}
+	messages = append(messages, schema.UserMessage(input.Query))
+	return messages
+}
+
+// prependSystemMessage 在消息列表前插入一条 system 消息
+func prependSystemMessage(systemPrompt string, messages []*schema.Message) []*schema.Message {
+	result := make([]*schema.Message, 0, len(messages)+1)
+	result = append(result, schema.SystemMessage(systemPrompt))
+	result = append(result, messages...)
+	return result
+}

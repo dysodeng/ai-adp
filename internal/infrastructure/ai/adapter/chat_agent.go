@@ -48,8 +48,20 @@ func NewChatAgent(
 }
 
 func (a *ChatAgent) Execute(ctx context.Context, agentExecutor executor.AgentExecutor) error {
-	// TODO: 实现执行逻辑
-	return fmt.Errorf("not implemented yet")
+	input := agentExecutor.GetInput()
+
+	messages := buildInputMessages(&input)
+	if a.config.Prompt.SystemPrompt != "" {
+		messages = prependSystemMessage(a.config.Prompt.SystemPrompt, messages)
+	}
+
+	runner := adk.NewRunner(ctx, adk.RunnerConfig{
+		Agent:           a.adkAgent,
+		EnableStreaming: true,
+	})
+	iter := runner.Run(ctx, messages)
+
+	return handleStreamingResult(iter, agentExecutor)
 }
 
 func (a *ChatAgent) GetID() string                                  { return a.config.AgentID }

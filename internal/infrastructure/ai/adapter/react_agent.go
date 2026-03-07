@@ -57,8 +57,20 @@ func NewReActAgent(
 }
 
 func (a *ReActAgent) Execute(ctx context.Context, agentExecutor executor.AgentExecutor) error {
-	// TODO: 实现执行逻辑
-	return fmt.Errorf("not implemented yet")
+	input := agentExecutor.GetInput()
+
+	messages := buildInputMessages(&input)
+	if a.config.Prompt.SystemPrompt != "" {
+		messages = prependSystemMessage(a.config.Prompt.SystemPrompt, messages)
+	}
+
+	runner := adk.NewRunner(ctx, adk.RunnerConfig{
+		Agent:           a.adkAgent,
+		EnableStreaming: true,
+	})
+	iter := runner.Run(ctx, messages)
+
+	return handleStreamingResultWithTools(iter, agentExecutor)
 }
 
 func (a *ReActAgent) GetID() string                                  { return a.config.AgentID }
