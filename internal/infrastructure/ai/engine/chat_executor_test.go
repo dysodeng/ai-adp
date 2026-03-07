@@ -12,7 +12,8 @@ import (
 )
 
 func TestChatExecutor_Execute(t *testing.T) {
-	exec := engine.NewChatExecutor(&stubChatModel{reply: "你好！"}, "你是一个友好的助手")
+	exec, err := engine.NewChatExecutor(context.Background(), &stubModel{reply: "你好！"}, "你是一个友好的助手")
+	require.NoError(t, err)
 
 	result, err := exec.Execute(context.Background(), &port.AppExecutorInput{
 		Query: "你好",
@@ -27,7 +28,8 @@ func TestChatExecutor_Execute(t *testing.T) {
 }
 
 func TestChatExecutor_Run(t *testing.T) {
-	exec := engine.NewChatExecutor(&stubChatModel{reply: "流式回复"}, "你是助手")
+	exec, err := engine.NewChatExecutor(context.Background(), &stubModel{reply: "流式回复"}, "你是助手")
+	require.NoError(t, err)
 
 	ch, err := exec.Run(context.Background(), &port.AppExecutorInput{
 		Query: "你好",
@@ -43,7 +45,8 @@ func TestChatExecutor_Run(t *testing.T) {
 }
 
 func TestChatExecutor_WithHistory(t *testing.T) {
-	exec := engine.NewChatExecutor(&stubChatModel{reply: "ok"}, "system prompt")
+	exec, err := engine.NewChatExecutor(context.Background(), &stubModel{reply: "ok"}, "system prompt")
+	require.NoError(t, err)
 
 	result, err := exec.Execute(context.Background(), &port.AppExecutorInput{
 		Query: "继续",

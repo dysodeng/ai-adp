@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	einomodel "github.com/cloudwego/eino/components/model"
+	"github.com/cloudwego/eino/components/tool"
 
 	"github.com/dysodeng/ai-adp/internal/domain/app/valueobject"
 	"github.com/dysodeng/ai-adp/internal/domain/shared/port"
@@ -24,21 +25,18 @@ func (f *ExecutorFactory) Create(
 	ctx context.Context,
 	appType valueobject.AppType,
 	config *valueobject.AppConfig,
-	chatModel einomodel.BaseChatModel,
+	chatModel einomodel.ToolCallingChatModel,
+	tools []tool.BaseTool,
 ) (port.AppExecutor, error) {
 	switch appType {
-	case valueobject.AppTypeTextGeneration:
-		return NewTextGenExecutor(chatModel, config.SystemPrompt), nil
+	case valueobject.AppTypeTextCompletion:
+		return NewTextGenExecutor(ctx, chatModel, config.SystemPrompt)
 
 	case valueobject.AppTypeChat:
-		return NewChatExecutor(chatModel, config.SystemPrompt), nil
+		return NewChatExecutor(ctx, chatModel, config.SystemPrompt)
 
 	case valueobject.AppTypeAgent:
-		toolModel, ok := chatModel.(einomodel.ToolCallingChatModel)
-		if !ok {
-			return nil, fmt.Errorf("engine: agent requires a ToolCallingChatModel, got %T", chatModel)
-		}
-		return NewAgentExecutor(toolModel, config.SystemPrompt, nil)
+		return NewAgentExecutor(ctx, chatModel, config.SystemPrompt, tools)
 
 	default:
 		return nil, fmt.Errorf("engine: unsupported app type %q", appType)

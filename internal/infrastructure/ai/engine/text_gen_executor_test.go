@@ -13,14 +13,14 @@ import (
 	"github.com/dysodeng/ai-adp/internal/infrastructure/ai/engine"
 )
 
-// stubChatModel 实现 model.BaseChatModel
-type stubChatModel struct{ reply string }
+// stubModel 实现 model.ToolCallingChatModel，供所有测试共用
+type stubModel struct{ reply string }
 
-func (s *stubChatModel) Generate(_ context.Context, _ []*schema.Message, _ ...model.Option) (*schema.Message, error) {
+func (s *stubModel) Generate(_ context.Context, _ []*schema.Message, _ ...model.Option) (*schema.Message, error) {
 	return schema.AssistantMessage(s.reply, nil), nil
 }
 
-func (s *stubChatModel) Stream(_ context.Context, _ []*schema.Message, _ ...model.Option) (*schema.StreamReader[*schema.Message], error) {
+func (s *stubModel) Stream(_ context.Context, _ []*schema.Message, _ ...model.Option) (*schema.StreamReader[*schema.Message], error) {
 	reader, writer := schema.Pipe[*schema.Message](1)
 	go func() {
 		defer writer.Close()
@@ -29,8 +29,13 @@ func (s *stubChatModel) Stream(_ context.Context, _ []*schema.Message, _ ...mode
 	return reader, nil
 }
 
+func (s *stubModel) WithTools(_ []*schema.ToolInfo) (model.ToolCallingChatModel, error) {
+	return s, nil
+}
+
 func TestTextGenExecutor_Execute(t *testing.T) {
-	exec := engine.NewTextGenExecutor(&stubChatModel{reply: "翻译结果"}, "你是翻译专家")
+	exec, err := engine.NewTextGenExecutor(context.Background(), &stubModel{reply: "翻译结果"}, "你是翻译专家")
+	require.NoError(t, err)
 
 	result, err := exec.Execute(context.Background(), &port.AppExecutorInput{
 		Query: "翻译这段话",
@@ -41,7 +46,8 @@ func TestTextGenExecutor_Execute(t *testing.T) {
 }
 
 func TestTextGenExecutor_Run(t *testing.T) {
-	exec := engine.NewTextGenExecutor(&stubChatModel{reply: "流式输出"}, "你是助手")
+	exec, err := engine.NewTextGenExecutor(context.Background(), &stubModel{reply: "流式输出"}, "你是助手")
+	require.NoError(t, err)
 
 	ch, err := exec.Run(context.Background(), &port.AppExecutorInput{
 		Query: "写一首诗",
@@ -57,7 +63,8 @@ func TestTextGenExecutor_Run(t *testing.T) {
 }
 
 func TestTextGenExecutor_WithVariables(t *testing.T) {
-	exec := engine.NewTextGenExecutor(&stubChatModel{reply: "ok"}, "你是{{language}}专家")
+	exec, err := engine.NewTextGenExecutor(context.Background(), &stubModel{reply: "ok"}, "你是{{language}}专家")
+	require.NoError(t, err)
 
 	result, err := exec.Execute(context.Background(), &port.AppExecutorInput{
 		Query:     "翻译",

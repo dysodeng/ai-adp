@@ -40,7 +40,7 @@ func (a *application) initialize() {
 	mainApp, err := di.InitApp(configPath)
 	if err != nil {
 		// logger 此时可能还未初始化，直接输出到 stderr
-		fmt.Fprintf(os.Stderr, "应用初始化失败: %v\n", err)
+		_, _ = fmt.Fprintf(os.Stderr, "应用初始化失败: %v\n", err)
 		os.Exit(1)
 	}
 	a.mainApp = mainApp

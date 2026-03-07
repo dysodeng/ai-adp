@@ -13,8 +13,8 @@ import (
 	modelconfig "github.com/dysodeng/ai-adp/internal/domain/model/model"
 )
 
-// NewChatModel 根据 ModelConfig 创建对应 Provider 的 Eino BaseChatModel
-func NewChatModel(ctx context.Context, m *modelconfig.ModelConfig) (einomodel.BaseChatModel, error) {
+// NewChatModel 根据 ModelConfig 创建对应 Provider 的 Eino ToolCallingChatModel
+func NewChatModel(ctx context.Context, m *modelconfig.ModelConfig) (einomodel.ToolCallingChatModel, error) {
 	switch m.Provider() {
 	case "openai", "openai_compatible":
 		cfg := &openai.ChatModelConfig{
@@ -65,7 +65,8 @@ func NewChatModel(ctx context.Context, m *modelconfig.ModelConfig) (einomodel.Ba
 			Model:  m.ModelID(),
 		}
 		if m.BaseURL() != "" {
-			cfg.BaseURL = &[]string{m.BaseURL()}[0]
+			baseURL := m.BaseURL()
+			cfg.BaseURL = &baseURL
 		}
 		if m.Temperature() != nil {
 			cfg.Temperature = m.Temperature()
@@ -81,7 +82,7 @@ func NewChatModel(ctx context.Context, m *modelconfig.ModelConfig) (einomodel.Ba
 }
 
 // NewChatModelWithOverrides 创建 ChatModel 并应用 AppConfig 中的覆盖参数
-func NewChatModelWithOverrides(ctx context.Context, m *modelconfig.ModelConfig, temperature *float32, maxTokens int) (einomodel.BaseChatModel, error) {
+func NewChatModelWithOverrides(ctx context.Context, m *modelconfig.ModelConfig, temperature *float32, maxTokens int) (einomodel.ToolCallingChatModel, error) {
 	overridden := modelconfig.Reconstitute(
 		m.ID(), m.Name(), m.Provider(), m.Capability(), m.ModelID(),
 		m.APIKey(), m.BaseURL(),

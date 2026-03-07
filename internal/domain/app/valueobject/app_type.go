@@ -6,14 +6,14 @@ type AppType string
 const (
 	AppTypeAgent          AppType = "agent"
 	AppTypeChat           AppType = "chat"
-	AppTypeTextGeneration AppType = "text_generation"
+	AppTypeTextCompletion AppType = "text_completion"
 	AppTypeChatFlow       AppType = "chat_flow"
 	AppTypeWorkflow       AppType = "workflow"
 )
 
 func (t AppType) IsValid() bool {
 	switch t {
-	case AppTypeAgent, AppTypeChat, AppTypeTextGeneration, AppTypeChatFlow, AppTypeWorkflow:
+	case AppTypeAgent, AppTypeChat, AppTypeTextCompletion, AppTypeChatFlow, AppTypeWorkflow:
 		return true
 	}
 	return false

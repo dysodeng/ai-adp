@@ -19,7 +19,7 @@ func TestExecutorFactory_UnsupportedType(t *testing.T) {
 		SystemPrompt: "test",
 	}
 
-	_, err := factory.Create(context.Background(), valueobject.AppTypeChatFlow, cfg, &stubChatModel{reply: "x"})
+	_, err := factory.Create(context.Background(), valueobject.AppTypeChatFlow, cfg, &stubModel{reply: "x"}, nil)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "unsupported")
 }
@@ -31,19 +31,19 @@ func TestExecutorFactory_Chat(t *testing.T) {
 		SystemPrompt: "你是助手",
 	}
 
-	exec, err := factory.Create(context.Background(), valueobject.AppTypeChat, cfg, &stubChatModel{reply: "hello"})
+	exec, err := factory.Create(context.Background(), valueobject.AppTypeChat, cfg, &stubModel{reply: "hello"}, nil)
 	require.NoError(t, err)
 	assert.NotNil(t, exec)
 }
 
-func TestExecutorFactory_TextGeneration(t *testing.T) {
+func TestExecutorFactory_TextCompletion(t *testing.T) {
 	factory := engine.NewExecutorFactory()
 	cfg := &valueobject.AppConfig{
 		ModelID:      uuid.New(),
 		SystemPrompt: "翻译",
 	}
 
-	exec, err := factory.Create(context.Background(), valueobject.AppTypeTextGeneration, cfg, &stubChatModel{reply: "translated"})
+	exec, err := factory.Create(context.Background(), valueobject.AppTypeTextCompletion, cfg, &stubModel{reply: "translated"}, nil)
 	require.NoError(t, err)
 	assert.NotNil(t, exec)
 }
@@ -55,7 +55,7 @@ func TestExecutorFactory_Agent(t *testing.T) {
 		SystemPrompt: "你是Agent",
 	}
 
-	exec, err := factory.Create(context.Background(), valueobject.AppTypeAgent, cfg, &stubToolCallingModel{reply: "ok"})
+	exec, err := factory.Create(context.Background(), valueobject.AppTypeAgent, cfg, &stubModel{reply: "ok"}, nil)
 	require.NoError(t, err)
 	assert.NotNil(t, exec)
 }

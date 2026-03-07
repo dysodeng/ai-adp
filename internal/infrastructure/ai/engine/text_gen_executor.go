@@ -2,60 +2,45 @@ package engine
 
 import (
 	"context"
-	"errors"
-	"io"
+	"fmt"
 
+	"github.com/cloudwego/eino/adk"
 	einomodel "github.com/cloudwego/eino/components/model"
 	"github.com/cloudwego/eino/schema"
 
 	"github.com/dysodeng/ai-adp/internal/domain/shared/port"
 )
 
-// TextGenExecutor 单次文本生成执行器（无对话上下文）
+// TextGenExecutor 单次文本补全执行器（无对话上下文），基于 ADK ChatModelAgent
 type TextGenExecutor struct {
-	model        einomodel.BaseChatModel
+	agent        adk.Agent
 	systemPrompt string
 }
 
-func NewTextGenExecutor(model einomodel.BaseChatModel, systemPrompt string) *TextGenExecutor {
-	return &TextGenExecutor{model: model, systemPrompt: systemPrompt}
+func NewTextGenExecutor(ctx context.Context, chatModel einomodel.ToolCallingChatModel, systemPrompt string) (*TextGenExecutor, error) {
+	agent, err := adk.NewChatModelAgent(ctx, &adk.ChatModelAgentConfig{
+		Name:        "text_completion",
+		Description: "Single-shot text completion agent",
+		Model:       chatModel,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("text_gen_executor: %w", err)
+	}
+	return &TextGenExecutor{agent: agent, systemPrompt: systemPrompt}, nil
 }
 
 func (e *TextGenExecutor) Execute(ctx context.Context, input *port.AppExecutorInput) (*port.AppResult, error) {
 	messages := e.buildMessages(input)
-	msg, err := e.model.Generate(ctx, messages)
-	if err != nil {
-		return nil, err
-	}
-	return &port.AppResult{Content: msg.Content}, nil
+	runner := adk.NewRunner(ctx, adk.RunnerConfig{Agent: e.agent})
+	iter := runner.Run(ctx, messages)
+	return collectResult(iter)
 }
 
 func (e *TextGenExecutor) Run(ctx context.Context, input *port.AppExecutorInput) (<-chan port.AppEvent, error) {
 	messages := e.buildMessages(input)
-	reader, err := e.model.Stream(ctx, messages)
-	if err != nil {
-		return nil, err
-	}
-	ch := make(chan port.AppEvent, 16)
-	go func() {
-		defer close(ch)
-		defer reader.Close()
-		for {
-			msg, err := reader.Recv()
-			if errors.Is(err, io.EOF) {
-				ch <- port.AppEvent{Type: port.AppEventDone}
-				return
-			}
-			if err != nil {
-				ch <- port.AppEvent{Type: port.AppEventError, Error: err}
-				return
-			}
-			if msg != nil && msg.Content != "" {
-				ch <- port.AppEvent{Type: port.AppEventMessage, Content: msg.Content}
-			}
-		}
-	}()
-	return ch, nil
+	runner := adk.NewRunner(ctx, adk.RunnerConfig{Agent: e.agent, EnableStreaming: true})
+	iter := runner.Run(ctx, messages)
+	return streamEvents(iter), nil
 }
 
 func (e *TextGenExecutor) buildMessages(input *port.AppExecutorInput) []*schema.Message {
