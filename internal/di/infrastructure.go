@@ -11,8 +11,8 @@ import (
 	agentservice "github.com/dysodeng/ai-adp/internal/domain/agent/service"
 	modeldomainrepo "github.com/dysodeng/ai-adp/internal/domain/model/repository"
 	"github.com/dysodeng/ai-adp/internal/domain/shared/port"
-	infraagent "github.com/dysodeng/ai-adp/internal/infrastructure/agent"
 	"github.com/dysodeng/ai-adp/internal/infrastructure/agent/adapter"
+	"github.com/dysodeng/ai-adp/internal/infrastructure/agent/cancel"
 	"github.com/dysodeng/ai-adp/internal/infrastructure/cache"
 	"github.com/dysodeng/ai-adp/internal/infrastructure/config"
 	"github.com/dysodeng/ai-adp/internal/infrastructure/logger"
@@ -35,10 +35,10 @@ var InfrastructureSet = wire.NewSet(
 	agentservice.NewAgentBuilder,
 	provideAgentFactory,
 	// 取消能力组件
-	infraagent.NewMemoryTaskRegistry,
-	wire.Bind(new(executor.TaskRegistry), new(*infraagent.MemoryTaskRegistry)),
-	infraagent.NewRedisCancelBroadcaster,
-	wire.Bind(new(executor.CancelBroadcaster), new(*infraagent.RedisCancelBroadcaster)),
+	cancel.NewMemoryTaskRegistry,
+	wire.Bind(new(executor.TaskRegistry), new(*cancel.MemoryTaskRegistry)),
+	cancel.NewRedisCancelBroadcaster,
+	wire.Bind(new(executor.CancelBroadcaster), new(*cancel.RedisCancelBroadcaster)),
 )
 
 // provideDB 初始化 DB 连接并自动执行迁移
