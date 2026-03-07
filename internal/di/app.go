@@ -5,7 +5,10 @@ import (
 
 	"go.uber.org/zap"
 
+	agentservice "github.com/dysodeng/ai-adp/internal/domain/agent/service"
 	appdomainrepo "github.com/dysodeng/ai-adp/internal/domain/app/repository"
+	"github.com/dysodeng/ai-adp/internal/domain/shared/port"
+	"github.com/dysodeng/ai-adp/internal/infrastructure/ai/adapter"
 	"github.com/dysodeng/ai-adp/internal/infrastructure/ai/engine"
 	"github.com/dysodeng/ai-adp/internal/infrastructure/logger"
 	"github.com/dysodeng/ai-adp/internal/infrastructure/server"
@@ -25,6 +28,10 @@ func NewApp(
 	_ appdomainrepo.AppRepository,
 	_ *zap.Logger,
 	tracerShutdown telemetry.ShutdownFunc,
+	// 新架构组件
+	_ port.ToolService,
+	_ agentservice.AgentBuilder,
+	_ *adapter.AgentFactory,
 ) *App {
 	return &App{
 		HTTPServer:     httpServer,

@@ -30,7 +30,7 @@ func (f *ExecutorFactory) Create(
 ) (port.AppExecutor, error) {
 	switch appType {
 	case valueobject.AppTypeTextCompletion:
-		return NewTextGenExecutor(ctx, chatModel, config.SystemPrompt)
+		return NewTextCompletionExecutor(ctx, chatModel, config.SystemPrompt)
 
 	case valueobject.AppTypeChat:
 		return NewChatExecutor(ctx, chatModel, config.SystemPrompt)

@@ -2,7 +2,7 @@
 
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
 
-**Goal:** 使用 CloudWeGo Eino + Eino-ext 为项目实现完整 AI 基础设施层。模型配置（API Key、Provider、Model ID 等）存储在数据库，支持后续模型管理功能（增删改查）；通过领域层 `model` 有界上下文（已存在骨架）抽象模型实体；AI 组件（LLMExecutor、Embedder、AgentExecutor）通过 Google Wire 注入应用。
+**Goal:** 使用 CloudWeGo Eino + Eino-ext 为 AI 应用开发平台实现完整 AI 基础设施层。模型配置（API Key、Provider、Model ID 等）存储在数据库，支持后续模型管理功能（增删改查）；通过领域层 `model` 有界上下文（已存在骨架）抽象模型实体；AI 组件（LLMExecutor、Embedder、AgentExecutor）通过 Google Wire 注入应用。
 
 **Architecture:**
 - **Domain** `internal/domain/model/` — 已有有界上下文骨架，填充 `ModelConfig` 聚合根（存储 provider/model_id/api_key/base_url 等），`ModelConfigRepository` 接口

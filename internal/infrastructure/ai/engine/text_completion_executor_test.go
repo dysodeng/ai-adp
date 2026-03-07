@@ -34,7 +34,7 @@ func (s *stubModel) WithTools(_ []*schema.ToolInfo) (model.ToolCallingChatModel,
 }
 
 func TestTextGenExecutor_Execute(t *testing.T) {
-	exec, err := engine.NewTextGenExecutor(context.Background(), &stubModel{reply: "翻译结果"}, "你是翻译专家")
+	exec, err := engine.NewTextCompletionExecutor(context.Background(), &stubModel{reply: "翻译结果"}, "你是翻译专家")
 	require.NoError(t, err)
 
 	result, err := exec.Execute(context.Background(), &port.AppExecutorInput{
@@ -46,7 +46,7 @@ func TestTextGenExecutor_Execute(t *testing.T) {
 }
 
 func TestTextGenExecutor_Run(t *testing.T) {
-	exec, err := engine.NewTextGenExecutor(context.Background(), &stubModel{reply: "流式输出"}, "你是助手")
+	exec, err := engine.NewTextCompletionExecutor(context.Background(), &stubModel{reply: "流式输出"}, "你是助手")
 	require.NoError(t, err)
 
 	ch, err := exec.Run(context.Background(), &port.AppExecutorInput{
@@ -63,7 +63,7 @@ func TestTextGenExecutor_Run(t *testing.T) {
 }
 
 func TestTextGenExecutor_WithVariables(t *testing.T) {
-	exec, err := engine.NewTextGenExecutor(context.Background(), &stubModel{reply: "ok"}, "你是{{language}}专家")
+	exec, err := engine.NewTextCompletionExecutor(context.Background(), &stubModel{reply: "ok"}, "你是{{language}}专家")
 	require.NoError(t, err)
 
 	result, err := exec.Execute(context.Background(), &port.AppExecutorInput{

@@ -8,6 +8,8 @@ package di
 
 import (
 	"github.com/dysodeng/ai-adp/internal/application/tenant/service"
+	service2 "github.com/dysodeng/ai-adp/internal/domain/agent/service"
+	"github.com/dysodeng/ai-adp/internal/domain/shared/port"
 	"github.com/dysodeng/ai-adp/internal/infrastructure/ai/engine"
 	"github.com/dysodeng/ai-adp/internal/infrastructure/config"
 	"github.com/dysodeng/ai-adp/internal/infrastructure/persistence/repository/app"
@@ -41,6 +43,9 @@ func InitApp(configPath string) (*App, error) {
 	if err != nil {
 		return nil, err
 	}
-	diApp := NewApp(httpServer, executorFactory, appRepositoryImpl, logger, shutdownFunc)
+	toolService := port.NewMockToolService()
+	agentBuilder := service2.NewAgentBuilder(toolService)
+	agentFactory := provideAgentFactory()
+	diApp := NewApp(httpServer, executorFactory, appRepositoryImpl, logger, shutdownFunc, toolService, agentBuilder, agentFactory)
 	return diApp, nil
 }

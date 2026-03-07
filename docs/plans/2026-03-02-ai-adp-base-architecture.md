@@ -2,7 +2,7 @@
 
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
 
-**Goal:** 搭建 AI 开发平台的 DDD 基础骨架，包含目录结构、共享类型、基础设施连接、DI 框架、HTTP 服务器，以及 `tenant` 完整 bounded context 作为其他 context 的模板。
+**Goal:** 搭建 AI 应用开发平台的 DDD 基础骨架，包含目录结构、共享类型、基础设施连接、DI 框架、HTTP 服务器，以及 `tenant` 完整 bounded context 作为其他 context 的模板。
 
 **Architecture:** 严格四层 DDD（domain / application / infrastructure / interfaces），7 个 bounded context（tenant / model / prompt / conversation / agent / knowledge / usage），Eino 封装在 infrastructure/ai/ 层，domain 层通过端口接口解耦。参考 dysodeng/app 风格，使用 Google Wire 编译期依赖注入。
 

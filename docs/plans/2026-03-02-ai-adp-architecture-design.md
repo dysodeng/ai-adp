@@ -1,4 +1,4 @@
-# AI Development Platform (ADP) — 底层架构设计
+# AI Application Development Platform (AI-ADP) — 底层架构设计
 
 **日期**: 2026-03-02
 **状态**: 已批准
