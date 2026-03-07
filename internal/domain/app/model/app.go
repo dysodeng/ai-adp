@@ -16,6 +16,13 @@ type App struct {
 	description string
 	appType     valueobject.AppType
 	icon        string
+
+	// 工具配置（由工具领域处理）
+	knowledgeList   []uuid.UUID // 知识库 ID 列表
+	toolList        []uuid.UUID // 插件工具 ID 列表
+	mcpServerList   []uuid.UUID // MCP 服务器 ID 列表
+	builtinToolList []uuid.UUID // 内置工具 ID 列表
+	appToolList     []uuid.UUID // App-as-Tool ID 列表
 }
 
 func NewApp(tenantID uuid.UUID, name, description string, appType valueobject.AppType, icon string) (*App, error) {
@@ -56,6 +63,17 @@ func (a *App) Name() string              { return a.name }
 func (a *App) Description() string       { return a.description }
 func (a *App) Type() valueobject.AppType { return a.appType }
 func (a *App) Icon() string              { return a.icon }
+
+func (a *App) KnowledgeList() []uuid.UUID   { return a.knowledgeList }
+func (a *App) ToolList() []uuid.UUID        { return a.toolList }
+func (a *App) McpServerList() []uuid.UUID   { return a.mcpServerList }
+func (a *App) BuiltinToolList() []uuid.UUID { return a.builtinToolList }
+func (a *App) AppToolList() []uuid.UUID     { return a.appToolList }
+
+// IsToolAgent 判断是否支持工具调用
+func (a *App) IsToolAgent() bool {
+	return a.appType == valueobject.AppTypeAgent
+}
 
 func (a *App) SetName(name string)               { a.name = name }
 func (a *App) SetDescription(description string) { a.description = description }
