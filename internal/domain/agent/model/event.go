@@ -6,6 +6,7 @@ import "time"
 type EventType string
 
 const (
+	EventTypeStart      EventType = "start"
 	EventTypeChunk      EventType = "chunk"
 	EventTypeThinking   EventType = "thinking"
 	EventTypeToolCall   EventType = "tool_call"
