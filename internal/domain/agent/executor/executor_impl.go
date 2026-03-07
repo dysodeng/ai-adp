@@ -73,9 +73,19 @@ func (e *agentExecutorImpl) Start() {
 	})
 }
 
+// isTerminated 是否已进入终态（调用方必须已持有锁）
+func (e *agentExecutorImpl) isTerminated() bool {
+	return e.status == model.ExecutionStatusCompleted ||
+		e.status == model.ExecutionStatusFailed ||
+		e.status == model.ExecutionStatusCancelled
+}
+
 func (e *agentExecutorImpl) Complete(output *model.ExecutionOutput) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
+	if e.isTerminated() {
+		return
+	}
 	e.status = model.ExecutionStatusCompleted
 	e.output = output
 	e.endTime = time.Now()
@@ -90,6 +100,9 @@ func (e *agentExecutorImpl) Complete(output *model.ExecutionOutput) {
 func (e *agentExecutorImpl) Fail(err error) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
+	if e.isTerminated() {
+		return
+	}
 	e.status = model.ExecutionStatusFailed
 	e.err = err
 	e.endTime = time.Now()
@@ -104,6 +117,9 @@ func (e *agentExecutorImpl) Fail(err error) {
 func (e *agentExecutorImpl) Cancel() {
 	e.mu.Lock()
 	defer e.mu.Unlock()
+	if e.isTerminated() {
+		return
+	}
 	e.status = model.ExecutionStatusCancelled
 	e.endTime = time.Now()
 	e.broadcastEvent(&model.Event{
