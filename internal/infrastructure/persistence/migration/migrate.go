@@ -11,6 +11,8 @@ func AutoMigrate(db *gorm.DB) error {
 	return db.AutoMigrate(
 		&entity.TenantEntity{},
 		&entity.WorkspaceEntity{},
-		&entity.ModelConfigEntity{}, // 新增
+		&entity.ModelConfigEntity{},
+		&entity.AppEntity{},
+		&entity.AppVersionEntity{},
 	)
 }
