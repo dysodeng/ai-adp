@@ -3,19 +3,20 @@ package service
 import (
 	"context"
 
-	"github.com/dysodeng/ai-adp/internal/domain/agent/agent"
-	"github.com/dysodeng/ai-adp/internal/domain/app/model"
+	"github.com/dysodeng/ai-adp/internal/domain/agent/model"
+	appModel "github.com/dysodeng/ai-adp/internal/domain/app/model"
 )
 
 // AgentBuilder Agent 构建器 - 领域服务
-// 负责根据 App 配置构建完整的 Agent
+// 负责根据 App 配置构建 Agent 配置
 type AgentBuilder interface {
-	// BuildAgent 根据 App 和输入构建 Agent
+	// BuildAgentConfig 根据 App 和输入构建 Agent 配置
 	// 处理所有业务逻辑：提示词、工具、模型配置
-	BuildAgent(
+	// 返回配置，由调用方使用基础设施层工厂创建 Agent
+	BuildAgentConfig(
 		ctx context.Context,
-		app *model.App,
+		app *appModel.App,
 		input map[string]any,
 		isStreaming bool,
-	) (agent.Agent, error)
+	) (*model.Config, error)
 }
