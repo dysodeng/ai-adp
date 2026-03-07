@@ -39,4 +39,5 @@ var ModulesSet = wire.NewSet(
 	TenantModuleSet,
 	AppModuleSet,
 	ModelModuleSet,
+	ChatModuleSet,
 )

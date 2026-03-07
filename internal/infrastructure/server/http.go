@@ -25,10 +25,11 @@ type HTTPServer struct {
 	mu            sync.Mutex
 	server        *http.Server
 	tenantHandler *handler.TenantHandler
+	chatHandler   *handler.ChatHandler
 }
 
-func NewHTTPServer(cfg *config.Config, tenantHandler *handler.TenantHandler) *HTTPServer {
-	return &HTTPServer{cfg: cfg, tenantHandler: tenantHandler}
+func NewHTTPServer(cfg *config.Config, tenantHandler *handler.TenantHandler, chatHandler *handler.ChatHandler) *HTTPServer {
+	return &HTTPServer{cfg: cfg, tenantHandler: tenantHandler, chatHandler: chatHandler}
 }
 
 func (s *HTTPServer) IsEnabled() bool { return true }
@@ -54,6 +55,7 @@ func (s *HTTPServer) Start() error {
 	r.GET("/health", handler.HealthCheck)
 	v1 := r.Group("/api/v1")
 	s.tenantHandler.RegisterRoutes(v1)
+	s.chatHandler.RegisterRoutes(v1)
 
 	// 同步绑定端口，立即暴露 bind 错误
 	ln, err := net.Listen("tcp", s.Addr())

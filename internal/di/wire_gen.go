@@ -7,6 +7,8 @@
 package di
 
 import (
+	chatorch "github.com/dysodeng/ai-adp/internal/application/chat/orchestrator"
+	chatservice "github.com/dysodeng/ai-adp/internal/application/chat/service"
 	"github.com/dysodeng/ai-adp/internal/application/tenant/service"
 	service2 "github.com/dysodeng/ai-adp/internal/domain/agent/service"
 	"github.com/dysodeng/ai-adp/internal/domain/shared/port"
@@ -33,7 +35,6 @@ func InitApp(configPath string) (*App, error) {
 	tenantRepositoryImpl := tenant.NewTenantRepository(db)
 	tenantAppService := service.NewTenantAppService(tenantRepositoryImpl)
 	tenantHandler := handler.NewTenantHandler(tenantAppService)
-	httpServer := server.NewHTTPServer(configConfig, tenantHandler)
 	executorFactory := engine.NewExecutorFactory()
 	appRepositoryImpl := app.NewAppRepository(db)
 	logger, err := provideLogger(configConfig)
@@ -48,6 +49,11 @@ func InitApp(configPath string) (*App, error) {
 	agentBuilder := service2.NewAgentBuilder(toolService)
 	modelConfigRepositoryImpl := modelrepo.NewModelConfigRepository(db)
 	agentFactory := provideAgentFactory(modelConfigRepositoryImpl)
+	// Chat module
+	executorOrchestrator := chatorch.NewExecutorOrchestrator(agentBuilder, agentFactory)
+	chatAppService := chatservice.NewChatAppService(executorOrchestrator, appRepositoryImpl)
+	chatHandler := handler.NewChatHandler(chatAppService)
+	httpServer := server.NewHTTPServer(configConfig, tenantHandler, chatHandler)
 	diApp := NewApp(httpServer, executorFactory, appRepositoryImpl, logger, shutdownFunc, toolService, agentBuilder, agentFactory)
 	return diApp, nil
 }
