@@ -1,6 +1,8 @@
 package adapter
 
 import (
+	"context"
+	"errors"
 	"io"
 
 	"github.com/cloudwego/eino/adk"
@@ -20,6 +22,13 @@ func extractUsage(msg *schema.Message) *model.TokenUsage {
 		InputTokens:  u.PromptTokens,
 		OutputTokens: u.CompletionTokens,
 		TotalTokens:  u.TotalTokens,
+	}
+}
+
+// failIfNotCanceled 非取消错误时调用 Fail，取消错误只返回不 Fail（由上层 executeAgent 处理）
+func failIfNotCanceled(agentExecutor executor.AgentExecutor, err error) {
+	if !errors.Is(err, context.Canceled) {
+		agentExecutor.Fail(err)
 	}
 }
 
@@ -47,7 +56,7 @@ func handleStreamingResult(
 			return nil
 		}
 		if event.Err != nil {
-			agentExecutor.Fail(event.Err)
+			failIfNotCanceled(agentExecutor, event.Err)
 			return event.Err
 		}
 		if event.Output == nil || event.Output.MessageOutput == nil {
@@ -62,7 +71,7 @@ func handleStreamingResult(
 					break
 				}
 				if err != nil {
-					agentExecutor.Fail(err)
+					failIfNotCanceled(agentExecutor, err)
 					return err
 				}
 				if msg != nil {
@@ -111,7 +120,7 @@ func handleStreamingResultWithTools(
 			return nil
 		}
 		if event.Err != nil {
-			agentExecutor.Fail(event.Err)
+			failIfNotCanceled(agentExecutor, event.Err)
 			return event.Err
 		}
 		if event.Output == nil || event.Output.MessageOutput == nil {
@@ -125,7 +134,7 @@ func handleStreamingResultWithTools(
 			if mv.IsStreaming {
 				msg, err := schema.ConcatMessageStream(mv.MessageStream)
 				if err != nil {
-					agentExecutor.Fail(err)
+					failIfNotCanceled(agentExecutor, err)
 					return err
 				}
 				if msg != nil {
@@ -155,7 +164,7 @@ func handleStreamingResultWithTools(
 					break
 				}
 				if err != nil {
-					agentExecutor.Fail(err)
+					failIfNotCanceled(agentExecutor, err)
 					return err
 				}
 				if msg != nil {
