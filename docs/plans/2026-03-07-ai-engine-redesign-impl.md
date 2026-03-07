@@ -2,9 +2,15 @@
 
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
 
-**Goal:** 重新设计 AI 引擎层，删除旧的底层组件封装，建立以 App 为核心的统一 Executor 架构，一期实现 Agent/Chat/TextGeneration 三种应用类型。
+**Goal:** 重新设计 AI 引擎层，删除旧的底层组件封装，建立以 App 为核心的统一 Executor 架构，一期实现 Agent/Chat/TextCompletion 三种应用类型。
 
-**Architecture:** 新建 `domain/app/` bounded context 定义 AI 应用聚合根（含版本管理），新建统一 `AppExecutor` 端口接口，在 `infrastructure/ai/engine/` 中按 App 类型实现 3 种 Executor（ChatExecutor/TextGenExecutor/AgentExecutor），通过 ExecutorFactory 动态创建。删除旧的 `LLMExecutor`/`AgentExecutor` 端口和对应适配器。
+**Architecture:** 新建 `domain/app/` bounded context 定义 AI 应用聚合根（含版本管理），新建统一 `AppExecutor` 端口接口，在 `infrastructure/ai/engine/` 中按 App 类型实现 3 种 Executor（ChatExecutor/TextGenExecutor/AgentExecutor），**所有 Executor 统一使用 Eino ADK 的 `adk.ChatModelAgent` + `adk.Runner` 作为基础**，通过 ExecutorFactory 动态创建。删除旧的 `LLMExecutor`/`AgentExecutor` 端口和对应适配器。
+
+**ADK 集成策略**：
+- TextCompletion/Chat：使用 `adk.NewChatModelAgent`（不配置工具），本质是简单的 LLM Chain
+- Agent：使用 `adk.NewChatModelAgent`（配置工具列表），启用 ReAct 工具调用循环
+- 所有 Executor 通过 `adk.NewRunner` 管理执行生命周期、流式输出和检查点
+- 创建 `event_adapter.go` 统一转换 ADK 的 `AgentEvent` 到领域的 `AppEvent`
 
 **Tech Stack:** Go 1.25, Eino v0.7.37 (ADK), Eino-ext (openai/ark/ollama/claude), Google Wire, GORM (PostgreSQL), UUID v7
 
@@ -131,16 +137,16 @@ package valueobject
 type AppType string
 
 const (
-	AppTypeAgent          AppType = "agent"           // Agent (ReAct)：LLM + 工具调用推理循环
-	AppTypeChat           AppType = "chat"            // 纯多轮对话，无工具/知识库
-	AppTypeTextGeneration AppType = "text_generation" // 单次文本生成，无对话上下文
-	AppTypeChatFlow       AppType = "chat_flow"       // 条件分支对话流（二期）
-	AppTypeWorkflow       AppType = "workflow"        // 确定性 DAG 工作流（二期）
+	AppTypeAgent         AppType = "agent"          // Agent (ReAct)：LLM + 工具调用推理循环
+	AppTypeChat          AppType = "chat"           // 纯多轮对话，无工具/知识库
+	AppTypeTextCompletion AppType = "text_completion" // 单次文本生成，无对话上下文
+	AppTypeChatFlow      AppType = "chat_flow"      // 条件分支对话流（二期）
+	AppTypeWorkflow      AppType = "workflow"       // 确定性 DAG 工作流（二期）
 )
 
 func (t AppType) IsValid() bool {
 	switch t {
-	case AppTypeAgent, AppTypeChat, AppTypeTextGeneration, AppTypeChatFlow, AppTypeWorkflow:
+	case AppTypeAgent, AppTypeChat, AppTypeTextCompletion, AppTypeChatFlow, AppTypeWorkflow:
 		return true
 	}
 	return false
@@ -871,13 +877,152 @@ git commit -m "feat(ai/engine): add model factory and prompt variable renderer"
 
 ---
 
-## Task 6：创建 AI 引擎层 — TextGenExecutor
+## Task 6：创建 AI 引擎层 — TextGenExecutor（基于 ADK）
 
 **Files:**
+- Create: `internal/infrastructure/ai/engine/event_adapter.go` — ADK 事件适配层
 - Create: `internal/infrastructure/ai/engine/text_gen_executor.go`
 - Create: `internal/infrastructure/ai/engine/text_gen_executor_test.go`
+- Modify: `internal/infrastructure/ai/engine/model_factory.go` — 返回 `ToolCallingChatModel`
 
-**Step 1: 先写测试**
+**核心设计**：
+- 使用 `adk.NewChatModelAgent`（不配置工具）创建 Agent
+- 通过 `adk.NewRunner` 管理执行生命周期
+- 创建 `event_adapter.go` 统一转换 ADK 的 `AgentEvent` 到领域的 `AppEvent`
+- 提示词变量在每次请求时渲染（因为 Agent 的 Instruction 在创建时固定）
+
+**Step 1: 修改 model_factory.go 返回 ToolCallingChatModel**
+
+修改 `internal/infrastructure/ai/engine/model_factory.go`：
+
+```go
+// NewChatModel 返回 ToolCallingChatModel（ADK ChatModelAgent 要求）
+func NewChatModel(ctx context.Context, m *modelconfig.ModelConfig) (einomodel.ToolCallingChatModel, error) {
+	baseURL := m.BaseURL()
+	return newChatModelWithOverrides(ctx, m, nil, 0, &baseURL)
+}
+
+// NewChatModelWithOverrides 返回 ToolCallingChatModel
+func NewChatModelWithOverrides(
+	ctx context.Context,
+	m *modelconfig.ModelConfig,
+	temperature *float32,
+	maxTokens int,
+) (einomodel.ToolCallingChatModel, error) {
+	baseURL := m.BaseURL()
+	return newChatModelWithOverrides(ctx, m, temperature, maxTokens, &baseURL)
+}
+
+func newChatModelWithOverrides(
+	ctx context.Context,
+	m *modelconfig.ModelConfig,
+	temperature *float32,
+	maxTokens int,
+	baseURL *string,
+) (einomodel.ToolCallingChatModel, error) {
+	// ... 实现保持不变，返回类型改为 ToolCallingChatModel
+}
+```
+
+**Step 2: 创建 event_adapter.go — ADK 事件适配层**
+
+创建 `internal/infrastructure/ai/engine/event_adapter.go`：
+
+```go
+package engine
+
+import (
+	"github.com/cloudwego/eino-ext/components/agent/adk"
+	"github.com/cloudwego/eino/schema"
+
+	"github.com/dysodeng/ai-adp/internal/domain/shared/port"
+)
+
+// collectResult 从 ADK AsyncIterator 收集非流式结果
+func collectResult(iter *adk.AsyncIterator[*adk.AgentEvent]) (*port.AppResult, error) {
+	var content string
+	var inputTokens, outputTokens int
+
+	for {
+		event, err := iter.Next()
+		if err != nil {
+			return nil, err
+		}
+		if event == nil {
+			break
+		}
+
+		if event.Output != nil && event.Output.Content != "" {
+			content += event.Output.Content
+		}
+		if event.Usage != nil {
+			inputTokens += event.Usage.PromptTokens
+			outputTokens += event.Usage.CompletionTokens
+		}
+	}
+
+	return &port.AppResult{
+		Content:      content,
+		InputTokens:  inputTokens,
+		OutputTokens: outputTokens,
+	}, nil
+}
+
+// streamEvents 将 ADK AsyncIterator 转换为 AppEvent channel
+func streamEvents(iter *adk.AsyncIterator[*adk.AgentEvent]) <-chan port.AppEvent {
+	ch := make(chan port.AppEvent, 16)
+	go func() {
+		defer close(ch)
+		for {
+			event, err := iter.Next()
+			if err != nil {
+				ch <- port.AppEvent{Type: port.AppEventError, Error: err}
+				return
+			}
+			if event == nil {
+				ch <- port.AppEvent{Type: port.AppEventDone}
+				return
+			}
+
+			// 转换 ADK 事件到领域事件
+			if event.Output != nil && event.Output.Content != "" {
+				ch <- port.AppEvent{Type: port.AppEventMessage, Content: event.Output.Content}
+			}
+			if event.Action != nil {
+				ch <- port.AppEvent{Type: port.AppEventToolCall, Content: event.Action.Name}
+			}
+		}
+	}()
+	return ch
+}
+
+// buildInputMessages 将 AppExecutorInput 转换为 Eino Messages
+func buildInputMessages(input *port.AppExecutorInput) []*schema.Message {
+	messages := make([]*schema.Message, 0, len(input.History)+1)
+	for _, h := range input.History {
+		if h.Role == "user" {
+			messages = append(messages, schema.UserMessage(h.Content))
+		} else {
+			messages = append(messages, schema.AssistantMessage(h.Content, nil))
+		}
+	}
+	messages = append(messages, schema.UserMessage(input.Query))
+	return messages
+}
+
+// prependSystemMessage 在消息列表前添加系统提示词
+func prependSystemMessage(systemPrompt string, messages []*schema.Message) []*schema.Message {
+	if systemPrompt == "" {
+		return messages
+	}
+	result := make([]*schema.Message, 0, len(messages)+1)
+	result = append(result, schema.SystemMessage(systemPrompt))
+	result = append(result, messages...)
+	return result
+}
+```
+
+**Step 3: 先写测试**
 
 创建 `internal/infrastructure/ai/engine/text_gen_executor_test.go`：
 
@@ -897,14 +1042,14 @@ import (
 	"github.com/dysodeng/ai-adp/internal/infrastructure/ai/engine"
 )
 
-// stubChatModel 实现 model.BaseChatModel
-type stubChatModel struct{ reply string }
+// stubModel 实现 ToolCallingChatModel（ADK 要求）
+type stubModel struct{ reply string }
 
-func (s *stubChatModel) Generate(_ context.Context, _ []*schema.Message, _ ...model.Option) (*schema.Message, error) {
+func (s *stubModel) Generate(_ context.Context, _ []*schema.Message, _ ...model.Option) (*schema.Message, error) {
 	return schema.AssistantMessage(s.reply, nil), nil
 }
 
-func (s *stubChatModel) Stream(_ context.Context, _ []*schema.Message, _ ...model.Option) (*schema.StreamReader[*schema.Message], error) {
+func (s *stubModel) Stream(_ context.Context, _ []*schema.Message, _ ...model.Option) (*schema.StreamReader[*schema.Message], error) {
 	reader, writer := schema.Pipe[*schema.Message](1)
 	go func() {
 		defer writer.Close()
@@ -913,8 +1058,13 @@ func (s *stubChatModel) Stream(_ context.Context, _ []*schema.Message, _ ...mode
 	return reader, nil
 }
 
+func (s *stubModel) WithTools(_ []*schema.ToolInfo) (model.ToolCallingChatModel, error) {
+	return s, nil
+}
+
 func TestTextGenExecutor_Execute(t *testing.T) {
-	exec := engine.NewTextGenExecutor(&stubChatModel{reply: "翻译结果"}, "你是翻译专家")
+	exec, err := engine.NewTextGenExecutor(context.Background(), &stubModel{reply: "翻译结果"}, "你是翻译专家")
+	require.NoError(t, err)
 
 	result, err := exec.Execute(context.Background(), &port.AppExecutorInput{
 		Query: "翻译这段话",
@@ -925,7 +1075,8 @@ func TestTextGenExecutor_Execute(t *testing.T) {
 }
 
 func TestTextGenExecutor_Run(t *testing.T) {
-	exec := engine.NewTextGenExecutor(&stubChatModel{reply: "流式输出"}, "你是助手")
+	exec, err := engine.NewTextGenExecutor(context.Background(), &stubModel{reply: "流式输出"}, "你是助手")
+	require.NoError(t, err)
 
 	ch, err := exec.Run(context.Background(), &port.AppExecutorInput{
 		Query: "写一首诗",
@@ -942,7 +1093,8 @@ func TestTextGenExecutor_Run(t *testing.T) {
 }
 
 func TestTextGenExecutor_WithVariables(t *testing.T) {
-	exec := engine.NewTextGenExecutor(&stubChatModel{reply: "ok"}, "你是{{language}}专家")
+	exec, err := engine.NewTextGenExecutor(context.Background(), &stubModel{reply: "ok"}, "你是{{language}}专家")
+	require.NoError(t, err)
 
 	result, err := exec.Execute(context.Background(), &port.AppExecutorInput{
 		Query:     "翻译",
@@ -954,13 +1106,13 @@ func TestTextGenExecutor_WithVariables(t *testing.T) {
 }
 ```
 
-**Step 2: 运行测试确认失败**
+**Step 4: 运行测试确认失败**
 
 ```bash
 go test ./internal/infrastructure/ai/engine/... -v
 ```
 
-**Step 3: 创建 TextGenExecutor**
+**Step 5: 创建 TextGenExecutor（基于 ADK）**
 
 创建 `internal/infrastructure/ai/engine/text_gen_executor.go`：
 
@@ -969,98 +1121,95 @@ package engine
 
 import (
 	"context"
-	"errors"
-	"io"
 
+	"github.com/cloudwego/eino-ext/components/agent/adk"
 	einomodel "github.com/cloudwego/eino/components/model"
-	"github.com/cloudwego/eino/schema"
 
 	"github.com/dysodeng/ai-adp/internal/domain/shared/port"
 )
 
-// TextGenExecutor 单次文本生成执行器（无对话上下文）
+// TextGenExecutor 单次文本生成执行器（基于 ADK ChatModelAgent）
 type TextGenExecutor struct {
-	model        einomodel.BaseChatModel
+	agent        adk.Agent
 	systemPrompt string
 }
 
-// NewTextGenExecutor 创建文本生成执行器
-func NewTextGenExecutor(model einomodel.BaseChatModel, systemPrompt string) *TextGenExecutor {
-	return &TextGenExecutor{model: model, systemPrompt: systemPrompt}
+// NewTextGenExecutor 创建文本生成执行器（使用 ADK ChatModelAgent，无工具）
+func NewTextGenExecutor(ctx context.Context, chatModel einomodel.ToolCallingChatModel, systemPrompt string) (*TextGenExecutor, error) {
+	agent, err := adk.NewChatModelAgent(ctx, &adk.ChatModelAgentConfig{
+		Name:        "text_completion",
+		Description: "Single-shot text completion agent",
+		Model:       chatModel,
+		// 不配置 ToolsConfig，创建无工具的简单 Chain
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return &TextGenExecutor{
+		agent:        agent,
+		systemPrompt: systemPrompt,
+	}, nil
 }
 
 // Execute 非流式执行
 func (e *TextGenExecutor) Execute(ctx context.Context, input *port.AppExecutorInput) (*port.AppResult, error) {
-	messages := e.buildMessages(input)
-	msg, err := e.model.Generate(ctx, messages)
+	messages := buildInputMessages(input)
+	prompt := RenderPrompt(e.systemPrompt, input.Variables)
+	messages = prependSystemMessage(prompt, messages)
+
+	runner := adk.NewRunner(e.agent)
+	iter, err := runner.Run(ctx, messages)
 	if err != nil {
 		return nil, err
 	}
-	return &port.AppResult{Content: msg.Content}, nil
+
+	return collectResult(iter)
 }
 
 // Run 流式执行
 func (e *TextGenExecutor) Run(ctx context.Context, input *port.AppExecutorInput) (<-chan port.AppEvent, error) {
-	messages := e.buildMessages(input)
-	reader, err := e.model.Stream(ctx, messages)
+	messages := buildInputMessages(input)
+	prompt := RenderPrompt(e.systemPrompt, input.Variables)
+	messages = prependSystemMessage(prompt, messages)
+
+	runner := adk.NewRunner(e.agent)
+	iter, err := runner.Stream(ctx, messages)
 	if err != nil {
 		return nil, err
 	}
-	ch := make(chan port.AppEvent, 16)
-	go func() {
-		defer close(ch)
-		defer reader.Close()
-		for {
-			msg, err := reader.Recv()
-			if errors.Is(err, io.EOF) {
-				ch <- port.AppEvent{Type: port.AppEventDone}
-				return
-			}
-			if err != nil {
-				ch <- port.AppEvent{Type: port.AppEventError, Error: err}
-				return
-			}
-			if msg != nil && msg.Content != "" {
-				ch <- port.AppEvent{Type: port.AppEventMessage, Content: msg.Content}
-			}
-		}
-	}()
-	return ch, nil
-}
 
-func (e *TextGenExecutor) buildMessages(input *port.AppExecutorInput) []*schema.Message {
-	prompt := RenderPrompt(e.systemPrompt, input.Variables)
-	messages := make([]*schema.Message, 0, 2)
-	if prompt != "" {
-		messages = append(messages, schema.SystemMessage(prompt))
-	}
-	messages = append(messages, schema.UserMessage(input.Query))
-	return messages
+	return streamEvents(iter), nil
 }
 ```
 
-**Step 4: 运行测试**
+**Step 6: 运行测试**
 
 ```bash
 go test ./internal/infrastructure/ai/engine/... -v
 ```
 
-预期：7 个测试 PASS（4 prompt + 3 text_gen）
+预期：所有 text_gen 测试 PASS
 
-**Step 5: 提交**
+**Step 7: 提交**
 
 ```bash
-git add internal/infrastructure/ai/engine/text_gen_executor.go internal/infrastructure/ai/engine/text_gen_executor_test.go
+git add internal/infrastructure/ai/engine/event_adapter.go internal/infrastructure/ai/engine/text_gen_executor.go internal/infrastructure/ai/engine/text_gen_executor_test.go internal/infrastructure/ai/engine/model_factory.go
 git commit -m "feat(ai/engine): TextGenExecutor for single-shot text generation"
 ```
 
 ---
 
-## Task 7：创建 AI 引擎层 — ChatExecutor
+## Task 7：创建 AI 引擎层 — ChatExecutor（基于 ADK）
 
 **Files:**
 - Create: `internal/infrastructure/ai/engine/chat_executor.go`
 - Create: `internal/infrastructure/ai/engine/chat_executor_test.go`
+
+**核心设计**：
+- 与 TextGenExecutor 类似，使用 `adk.NewChatModelAgent`（不配置工具）
+- 区别在于 Chat 需要处理对话历史（`input.History`）
+- 通过 `buildInputMessages` 将历史和当前查询转换为 Eino Messages
 
 **Step 1: 先写测试**
 
@@ -1081,7 +1230,8 @@ import (
 )
 
 func TestChatExecutor_Execute(t *testing.T) {
-	exec := engine.NewChatExecutor(&stubChatModel{reply: "你好！"}, "你是一个友好的助手")
+	exec, err := engine.NewChatExecutor(context.Background(), &stubModel{reply: "你好！"}, "你是一个友好的助手")
+	require.NoError(t, err)
 
 	result, err := exec.Execute(context.Background(), &port.AppExecutorInput{
 		Query: "你好",
@@ -1096,7 +1246,8 @@ func TestChatExecutor_Execute(t *testing.T) {
 }
 
 func TestChatExecutor_Run(t *testing.T) {
-	exec := engine.NewChatExecutor(&stubChatModel{reply: "流式回复"}, "你是助手")
+	exec, err := engine.NewChatExecutor(context.Background(), &stubModel{reply: "流式回复"}, "你是助手")
+	require.NoError(t, err)
 
 	ch, err := exec.Run(context.Background(), &port.AppExecutorInput{
 		Query: "你好",
@@ -1112,7 +1263,8 @@ func TestChatExecutor_Run(t *testing.T) {
 }
 
 func TestChatExecutor_WithHistory(t *testing.T) {
-	exec := engine.NewChatExecutor(&stubChatModel{reply: "ok"}, "system prompt")
+	exec, err := engine.NewChatExecutor(context.Background(), &stubModel{reply: "ok"}, "system prompt")
+	require.NoError(t, err)
 
 	result, err := exec.Execute(context.Background(), &port.AppExecutorInput{
 		Query: "继续",
@@ -1135,7 +1287,7 @@ func TestChatExecutor_WithHistory(t *testing.T) {
 go test ./internal/infrastructure/ai/engine/... -run TestChatExecutor -v
 ```
 
-**Step 3: 创建 ChatExecutor**
+**Step 3: 创建 ChatExecutor（基于 ADK）**
 
 创建 `internal/infrastructure/ai/engine/chat_executor.go`：
 
@@ -1144,18 +1296,80 @@ package engine
 
 import (
 	"context"
-	"errors"
-	"io"
 
+	"github.com/cloudwego/eino-ext/components/agent/adk"
 	einomodel "github.com/cloudwego/eino/components/model"
-	"github.com/cloudwego/eino/schema"
 
 	"github.com/dysodeng/ai-adp/internal/domain/shared/port"
 )
 
-// ChatExecutor 多轮对话执行器（纯对话，无工具/知识库）
+// ChatExecutor 多轮对话执行器（基于 ADK ChatModelAgent，无工具）
 type ChatExecutor struct {
-	model        einomodel.BaseChatModel
+	agent        adk.Agent
+	systemPrompt string
+}
+
+// NewChatExecutor 创建对话执行器（使用 ADK ChatModelAgent，无工具）
+func NewChatExecutor(ctx context.Context, chatModel einomodel.ToolCallingChatModel, systemPrompt string) (*ChatExecutor, error) {
+	agent, err := adk.NewChatModelAgent(ctx, &adk.ChatModelAgentConfig{
+		Name:        "chat",
+		Description: "Multi-turn conversation agent",
+		Model:       chatModel,
+		// 不配置 ToolsConfig，创建无工具的简单 Chain
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return &ChatExecutor{
+		agent:        agent,
+		systemPrompt: systemPrompt,
+	}, nil
+}
+
+// Execute 非流式执行
+func (e *ChatExecutor) Execute(ctx context.Context, input *port.AppExecutorInput) (*port.AppResult, error) {
+	messages := buildInputMessages(input)
+	prompt := RenderPrompt(e.systemPrompt, input.Variables)
+	messages = prependSystemMessage(prompt, messages)
+
+	runner := adk.NewRunner(e.agent)
+	iter, err := runner.Run(ctx, messages)
+	if err != nil {
+		return nil, err
+	}
+
+	return collectResult(iter)
+}
+
+// Run 流式执行
+func (e *ChatExecutor) Run(ctx context.Context, input *port.AppExecutorInput) (<-chan port.AppEvent, error) {
+	messages := buildInputMessages(input)
+	prompt := RenderPrompt(e.systemPrompt, input.Variables)
+	messages = prependSystemMessage(prompt, messages)
+
+	runner := adk.NewRunner(e.agent)
+	iter, err := runner.Stream(ctx, messages)
+	if err != nil {
+		return nil, err
+	}
+
+	return streamEvents(iter), nil
+}
+```
+
+**Step 4: 运行测试**
+
+```bash
+go test ./internal/infrastructure/ai/engine/... -run TestChatExecutor -v
+```
+
+预期：所有 chat 测试 PASS
+
+**Step 5: 提交**
+
+```bash
+git add internal/infrastructure/ai/engine/chat_executor.go internal/infrastructure/ai/engine/chat_executor_test.go
 	systemPrompt string
 }
 
@@ -1260,8 +1474,6 @@ import (
 	"context"
 	"testing"
 
-	"github.com/cloudwego/eino/components/model"
-	"github.com/cloudwego/eino/schema"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -1269,30 +1481,8 @@ import (
 	"github.com/dysodeng/ai-adp/internal/infrastructure/ai/engine"
 )
 
-// stubToolCallingModel 实现 model.ToolCallingChatModel
-type stubToolCallingModel struct {
-	reply string
-}
-
-func (s *stubToolCallingModel) Generate(_ context.Context, _ []*schema.Message, _ ...model.Option) (*schema.Message, error) {
-	return schema.AssistantMessage(s.reply, nil), nil
-}
-
-func (s *stubToolCallingModel) Stream(_ context.Context, _ []*schema.Message, _ ...model.Option) (*schema.StreamReader[*schema.Message], error) {
-	reader, writer := schema.Pipe[*schema.Message](1)
-	go func() {
-		defer writer.Close()
-		writer.Send(schema.AssistantMessage(s.reply, nil), nil)
-	}()
-	return reader, nil
-}
-
-func (s *stubToolCallingModel) BindTools(_ []*schema.ToolInfo) error {
-	return nil
-}
-
 func TestAgentExecutor_Execute(t *testing.T) {
-	exec, err := engine.NewAgentExecutor(&stubToolCallingModel{reply: "Agent回复"}, "你是一个Agent", nil)
+	exec, err := engine.NewAgentExecutor(context.Background(), &stubModel{reply: "Agent回复"}, "你是一个Agent", nil)
 	require.NoError(t, err)
 
 	result, err := exec.Execute(context.Background(), &port.AppExecutorInput{
@@ -1304,12 +1494,12 @@ func TestAgentExecutor_Execute(t *testing.T) {
 }
 
 func TestAgentExecutor_NilModel(t *testing.T) {
-	_, err := engine.NewAgentExecutor(nil, "system", nil)
+	_, err := engine.NewAgentExecutor(context.Background(), nil, "system", nil)
 	assert.Error(t, err)
 }
 
 func TestAgentExecutor_Run(t *testing.T) {
-	exec, err := engine.NewAgentExecutor(&stubToolCallingModel{reply: "流式Agent"}, "你是Agent", nil)
+	exec, err := engine.NewAgentExecutor(context.Background(), &stubModel{reply: "流式Agent"}, "你是Agent", nil)
 	require.NoError(t, err)
 
 	ch, err := exec.Run(context.Background(), &port.AppExecutorInput{
@@ -1325,6 +1515,8 @@ func TestAgentExecutor_Run(t *testing.T) {
 	assert.Equal(t, port.AppEventDone, events[len(events)-1].Type)
 }
 ```
+}
+```
 
 **Step 2: 运行测试确认失败**
 
@@ -1332,7 +1524,7 @@ func TestAgentExecutor_Run(t *testing.T) {
 go test ./internal/infrastructure/ai/engine/... -run TestAgentExecutor -v
 ```
 
-**Step 3: 创建 AgentExecutor**
+**Step 3: 创建 AgentExecutor（基于 ADK ChatModelAgent with tools）**
 
 创建 `internal/infrastructure/ai/engine/agent_executor.go`：
 
@@ -1341,128 +1533,89 @@ package engine
 
 import (
 	"context"
-	"errors"
 	"fmt"
-	"io"
 
+	"github.com/cloudwego/eino-ext/components/agent/adk"
+	"github.com/cloudwego/eino-ext/components/agent/adk/compose"
 	einomodel "github.com/cloudwego/eino/components/model"
-	"github.com/cloudwego/eino/flow/agent/react"
-	"github.com/cloudwego/eino/schema"
-	"github.com/cloudwego/eino/schema/tool"
+	"github.com/cloudwego/eino/components/tool"
 
 	"github.com/dysodeng/ai-adp/internal/domain/shared/port"
 )
 
-// AgentExecutor ReAct Agent 执行器（LLM + Tools 推理循环）
+// AgentExecutor ReAct Agent 执行器（基于 ADK ChatModelAgent with tools）
 type AgentExecutor struct {
-	chatModel    einomodel.ToolCallingChatModel
+	agent        adk.Agent
 	systemPrompt string
-	tools        []*tool.Info
 }
 
-// NewAgentExecutor 创建 Agent 执行器
-func NewAgentExecutor(chatModel einomodel.ToolCallingChatModel, systemPrompt string, tools []*tool.Info) (*AgentExecutor, error) {
+// NewAgentExecutor 创建 Agent 执行器（使用 ADK ChatModelAgent，配置工具）
+func NewAgentExecutor(
+	ctx context.Context,
+	chatModel einomodel.ToolCallingChatModel,
+	systemPrompt string,
+	tools []tool.BaseTool,
+) (*AgentExecutor, error) {
 	if chatModel == nil {
 		return nil, fmt.Errorf("agent_executor: chatModel is required")
 	}
+
+	agent, err := adk.NewChatModelAgent(ctx, &adk.ChatModelAgentConfig{
+		Name:        "agent",
+		Description: "ReAct agent with tool calling capabilities",
+		Model:       chatModel,
+		ToolsConfig: adk.ToolsConfig{
+			ToolsNodeConfig: compose.ToolsNodeConfig{
+				Tools: tools,
+			},
+		},
+	})
+	if err != nil {
+		return nil, fmt.Errorf("agent_executor: failed to create agent: %w", err)
+	}
+
 	return &AgentExecutor{
-		chatModel:    chatModel,
+		agent:        agent,
 		systemPrompt: systemPrompt,
-		tools:        tools,
 	}, nil
 }
 
 // Execute 非流式执行
 func (e *AgentExecutor) Execute(ctx context.Context, input *port.AppExecutorInput) (*port.AppResult, error) {
-	messages := e.buildMessages(input)
+	messages := buildInputMessages(input)
+	prompt := RenderPrompt(e.systemPrompt, input.Variables)
+	messages = prependSystemMessage(prompt, messages)
 
-	agent, err := react.NewAgent(ctx, &react.AgentConfig{
-		ToolCallingModel: e.chatModel,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("agent_executor: failed to create agent: %w", err)
-	}
-
-	msg, err := agent.Generate(ctx, messages)
+	runner := adk.NewRunner(e.agent)
+	iter, err := runner.Run(ctx, messages)
 	if err != nil {
 		return nil, err
 	}
-	return &port.AppResult{Content: msg.Content}, nil
+
+	return collectResult(iter)
 }
 
 // Run 流式执行
 func (e *AgentExecutor) Run(ctx context.Context, input *port.AppExecutorInput) (<-chan port.AppEvent, error) {
-	messages := e.buildMessages(input)
+	messages := buildInputMessages(input)
+	prompt := RenderPrompt(e.systemPrompt, input.Variables)
+	messages = prependSystemMessage(prompt, messages)
 
-	agent, err := react.NewAgent(ctx, &react.AgentConfig{
-		ToolCallingModel: e.chatModel,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("agent_executor: failed to create agent: %w", err)
-	}
-
-	reader, err := agent.Stream(ctx, messages)
+	runner := adk.NewRunner(e.agent)
+	iter, err := runner.Stream(ctx, messages)
 	if err != nil {
 		return nil, err
 	}
 
-	ch := make(chan port.AppEvent, 32)
-	go func() {
-		defer close(ch)
-		defer reader.Close()
-		for {
-			msg, err := reader.Recv()
-			if errors.Is(err, io.EOF) {
-				ch <- port.AppEvent{Type: port.AppEventDone}
-				return
-			}
-			if err != nil {
-				ch <- port.AppEvent{Type: port.AppEventError, Error: err}
-				return
-			}
-			if msg == nil {
-				continue
-			}
-			if len(msg.ToolCalls) > 0 {
-				for _, tc := range msg.ToolCalls {
-					ch <- port.AppEvent{
-						Type:    port.AppEventToolCall,
-						Content: tc.Function.Name,
-					}
-				}
-			} else if msg.Content != "" {
-				ch <- port.AppEvent{
-					Type:    port.AppEventMessage,
-					Content: msg.Content,
-				}
-			}
-		}
-	}()
-	return ch, nil
-}
-
-func (e *AgentExecutor) buildMessages(input *port.AppExecutorInput) []*schema.Message {
-	prompt := RenderPrompt(e.systemPrompt, input.Variables)
-	messages := make([]*schema.Message, 0, len(input.History)+2)
-	if prompt != "" {
-		messages = append(messages, schema.SystemMessage(prompt))
-	}
-	for _, m := range input.History {
-		switch m.Role {
-		case "system":
-			messages = append(messages, schema.SystemMessage(m.Content))
-		case "assistant":
-			messages = append(messages, schema.AssistantMessage(m.Content, nil))
-		default:
-			messages = append(messages, schema.UserMessage(m.Content))
-		}
-	}
-	messages = append(messages, schema.UserMessage(input.Query))
-	return messages
+	return streamEvents(iter), nil
 }
 ```
 
-> **注意：** `tool.Info` 和 `react.AgentConfig` 的字段需与实际 Eino 版本匹配。若编译报错，运行 `go doc github.com/cloudwego/eino/flow/agent/react AgentConfig` 和 `go doc github.com/cloudwego/eino/schema/tool Info` 确认。`schema/tool` 路径可能是 `schema.ToolInfo`，需根据实际 API 调整。
+**核心变化**：
+- 使用 `adk.NewChatModelAgent` 替代 `react.NewAgent`
+- 通过 `ToolsConfig` 配置工具列表，启用 ReAct 循环
+- 复用 `event_adapter.go` 中的 `collectResult` 和 `streamEvents`
+- 复用 `buildInputMessages` 和 `prependSystemMessage` 处理消息
 
 **Step 4: 运行测试**
 
@@ -1530,14 +1683,14 @@ func TestExecutorFactory_Chat(t *testing.T) {
 	assert.NotNil(t, exec)
 }
 
-func TestExecutorFactory_TextGeneration(t *testing.T) {
+func TestExecutorFactory_TextCompletion(t *testing.T) {
 	factory := engine.NewExecutorFactory()
 	cfg := &valueobject.AppConfig{
 		ModelID:      uuid.New(),
 		SystemPrompt: "翻译",
 	}
 
-	exec, err := factory.Create(context.Background(), valueobject.AppTypeTextGeneration, cfg, &stubChatModel{reply: "translated"})
+	exec, err := factory.Create(context.Background(), valueobject.AppTypeTextCompletion, cfg, &stubChatModel{reply: "translated"})
 	require.NoError(t, err)
 	assert.NotNil(t, exec)
 }
@@ -1595,7 +1748,7 @@ func (f *ExecutorFactory) Create(
 	chatModel einomodel.BaseChatModel,
 ) (port.AppExecutor, error) {
 	switch appType {
-	case valueobject.AppTypeTextGeneration:
+	case valueobject.AppTypeTextCompletion:
 		return NewTextGenExecutor(chatModel, config.SystemPrompt), nil
 
 	case valueobject.AppTypeChat:

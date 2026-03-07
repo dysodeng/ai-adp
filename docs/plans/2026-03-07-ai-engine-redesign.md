@@ -22,7 +22,7 @@
 |---|---|---|
 | `agent` | LLM + 工具调用的 ReAct 推理循环，支持工具和知识库 | Yes |
 | `chat` | 纯多轮对话，保持会话历史，无工具/无知识库 | Yes |
-| `text_generation` | 单次 LLM 调用，无对话上下文，用于翻译/摘要/写作 | Yes |
+| `text_completion` | 单次 LLM 调用，无对话上下文，用于翻译/摘要/写作 | Yes |
 | `chat_flow` | 基于条件分支的多轮对话流 | 二期 |
 | `workflow` | 确定性 DAG 工作流，单次触发执行 | 二期 |
 
@@ -60,7 +60,7 @@ App 直接归属 Tenant，不经过 Workspace 中间层。
 
 ### 3.3 值对象
 
-**AppType**: `agent` | `chat` | `text_generation` | `chat_flow` | `workflow`
+**AppType**: `agent` | `chat` | `text_completion` | `chat_flow` | `workflow`
 
 **VersionStatus**: `draft` | `published` | `archived`
 
@@ -145,11 +145,18 @@ type ExecutorFactory interface {
 
 | App Type | Executor | Eino ADK 组件 |
 |---|---|---|
-| `text_generation` | TextGenExecutor | `ChatModel.Generate()` 直接调用 |
-| `chat` | ChatExecutor | `ChatModel.Generate/Stream()` 带历史管理 |
-| `agent` | AgentExecutor | `adk.ChatModelAgent` + `adk.Runner` ReAct 循环 |
+| `text_completion` | TextGenExecutor | `adk.ChatModelAgent`（无工具）+ `adk.Runner` |
+| `chat` | ChatExecutor | `adk.ChatModelAgent`（无工具）+ `adk.Runner` |
+| `agent` | AgentExecutor | `adk.ChatModelAgent`（带工具）+ `adk.Runner` |
 | `chat_flow`（二期）| ChatFlowExecutor | `adk.SequentialAgent` + 条件分支 |
 | `workflow`（二期）| WorkflowExecutor | `adk.SequentialAgent/ParallelAgent` |
+
+**核心原理**：
+- 所有应用类型统一使用 `adk.NewChatModelAgent` 作为基础
+- TextCompletion/Chat：创建不带工具的 ChatModelAgent，本质是简单的 LLM Chain
+- Agent：创建带工具的 ChatModelAgent，启用 ReAct 工具调用循环
+- 所有 Executor 通过 `adk.NewRunner` 管理执行生命周期、流式输出和检查点
+- 事件适配层（`event_adapter.go`）统一转换 ADK 的 `AgentEvent` 到领域的 `AppEvent`
 
 ### 4.4 提示词变量注入
 
