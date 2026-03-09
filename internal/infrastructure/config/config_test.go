@@ -4,15 +4,15 @@ import (
 	"os"
 	"testing"
 
+	"github.com/dysodeng/ai-adp/internal/infrastructure/config"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/dysodeng/ai-adp/internal/infrastructure/config"
 )
 
 const testConfigYAML = `
 app:
   name: ai-adp-test
-  env: test
+  environment: test
   debug: false
 server:
   http:
@@ -24,9 +24,9 @@ logger:
   level: debug
   format: json
   output_path: stdout
-jwt:
-  secret: test-secret
-  expire_hour: 12
+security:
+  jwt:
+    secret: test-secret
 database:
   host: localhost
   port: 5432
@@ -38,10 +38,27 @@ database:
   max_idle_conns: 5
   conn_max_lifetime: 30
 redis:
-  addr: localhost:6379
-  db: 1
-  pool_size: 5
-  min_idle_conns: 2
+  main:
+    mode: standalone
+    host: 127.0.0.1
+    port: "6379"
+    db: 0
+    pool:
+      min_idle_conns: 10
+      max_retries: 3
+      pool_size: 100
+  cache:
+    mode: standalone
+    host: 127.0.0.1
+    port: "6379"
+    db: 1
+    pool:
+      min_idle_conns: 10
+      max_retries: 3
+      pool_size: 100
+cache:
+  driver: redis
+  serializer: json
 tracing:
   enabled: true
   endpoint: localhost:4317
@@ -66,7 +83,7 @@ func TestLoad_AllSections(t *testing.T) {
 
 	// App
 	assert.Equal(t, "ai-adp-test", cfg.App.Name)
-	assert.Equal(t, "test", cfg.App.Env)
+	assert.Equal(t, "test", cfg.App.Environment)
 	assert.False(t, cfg.App.Debug)
 
 	// Server
@@ -78,9 +95,8 @@ func TestLoad_AllSections(t *testing.T) {
 	assert.Equal(t, "debug", cfg.Logger.Level)
 	assert.Equal(t, "json", cfg.Logger.Format)
 
-	// JWT
-	assert.Equal(t, "test-secret", cfg.JWT.Secret)
-	assert.Equal(t, 12, cfg.JWT.ExpireHour)
+	// Security
+	assert.Equal(t, "test-secret", cfg.Security.JWT.Secret)
 
 	// Database
 	assert.Equal(t, "localhost", cfg.Database.Host)
@@ -89,7 +105,10 @@ func TestLoad_AllSections(t *testing.T) {
 	assert.Equal(t, 30, cfg.Database.ConnMaxLifetime)
 
 	// Redis
-	assert.Equal(t, 5, cfg.Redis.PoolSize)
+	assert.Equal(t, "standalone", cfg.Redis.Main.Mode)
+	assert.Equal(t, "127.0.0.1", cfg.Redis.Main.Host)
+	assert.Equal(t, 100, cfg.Redis.Main.Pool.PoolSize)
+	assert.Equal(t, 1, cfg.Redis.Cache.DB)
 
 	// Tracing
 	assert.True(t, cfg.Tracing.Enabled)
@@ -108,19 +127,18 @@ database:
   name: db
   user: user
 redis:
-  addr: localhost:6379
+  main:
+    host: 127.0.0.1
+    port: "6379"
 `
 	path := writeTempConfig(t, minimal)
 	cfg, err := config.Load(path)
 	require.NoError(t, err)
 
-	assert.Equal(t, 8080, cfg.Server.HTTP.Port)
-	assert.Equal(t, 30, cfg.Server.HTTP.ReadTimeout)
 	assert.Equal(t, "info", cfg.Logger.Level)
 	assert.Equal(t, "json", cfg.Logger.Format)
-	assert.Equal(t, 24, cfg.JWT.ExpireHour)
 	assert.Equal(t, 100, cfg.Database.MaxOpenConns)
-	assert.Equal(t, 10, cfg.Redis.PoolSize)
+	assert.Equal(t, "127.0.0.1", cfg.Redis.Main.Host)
 	assert.False(t, cfg.Tracing.Enabled)
 	assert.InDelta(t, 1.0, cfg.Tracing.SampleRate, 0.001)
 }

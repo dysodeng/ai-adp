@@ -13,7 +13,6 @@ import (
 	service2 "github.com/dysodeng/ai-adp/internal/domain/agent/service"
 	"github.com/dysodeng/ai-adp/internal/domain/shared/port"
 	"github.com/dysodeng/ai-adp/internal/infrastructure/agent/cancel"
-	"github.com/dysodeng/ai-adp/internal/infrastructure/cache"
 	"github.com/dysodeng/ai-adp/internal/infrastructure/config"
 	"github.com/dysodeng/ai-adp/internal/infrastructure/persistence/repository/app"
 	"github.com/dysodeng/ai-adp/internal/infrastructure/persistence/repository/model"
@@ -46,7 +45,10 @@ func InitApp(configPath string) (*App, error) {
 	appRepositoryImpl := app.NewAppRepository(db)
 	chatAppService := service3.NewChatAppService(executorOrchestrator, appRepositoryImpl)
 	chatHandler := handler.NewChatHandler(chatAppService)
-	client := cache.NewRedisClient(configConfig)
+	client, err := provideRedis(configConfig)
+	if err != nil {
+		return nil, err
+	}
 	redisCancelBroadcaster := cancel.NewRedisCancelBroadcaster(client)
 	cancelHandler := handler.NewCancelHandler(memoryTaskRegistry, redisCancelBroadcaster)
 	router := http.NewRouter(tenantHandler, chatHandler, cancelHandler)

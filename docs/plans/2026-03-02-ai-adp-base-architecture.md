@@ -415,7 +415,7 @@ type Config struct {
 
 type AppConfig struct {
     Name string `mapstructure:"name"`
-    Env  string `mapstructure:"env"`
+	Environment  string `mapstructure:"environment"`
     Port int    `mapstructure:"port"`
 }
 

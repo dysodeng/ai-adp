@@ -3,21 +3,20 @@ package cancel
 import (
 	"context"
 
-	"github.com/redis/go-redis/v9"
-
 	"github.com/dysodeng/ai-adp/internal/domain/agent/executor"
 	"github.com/dysodeng/ai-adp/internal/infrastructure/logger"
+	pkgredis "github.com/dysodeng/ai-adp/internal/infrastructure/pkg/redis"
 )
 
 const cancelChannel = "agent:task:cancel"
 
 // RedisCancelBroadcaster 基于 Redis Pub/Sub 的取消信号广播器
 type RedisCancelBroadcaster struct {
-	client *redis.Client
+	client pkgredis.Client
 }
 
 // NewRedisCancelBroadcaster 创建 Redis 取消广播器
-func NewRedisCancelBroadcaster(client *redis.Client) *RedisCancelBroadcaster {
+func NewRedisCancelBroadcaster(client pkgredis.Client) *RedisCancelBroadcaster {
 	return &RedisCancelBroadcaster{client: client}
 }
 

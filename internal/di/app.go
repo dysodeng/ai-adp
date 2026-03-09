@@ -11,6 +11,7 @@ import (
 	"github.com/dysodeng/ai-adp/internal/domain/shared/port"
 	"github.com/dysodeng/ai-adp/internal/infrastructure/agent/adapter"
 	"github.com/dysodeng/ai-adp/internal/infrastructure/logger"
+	"github.com/dysodeng/ai-adp/internal/infrastructure/pkg/redis"
 	"github.com/dysodeng/ai-adp/internal/infrastructure/server"
 	"github.com/dysodeng/ai-adp/internal/infrastructure/telemetry"
 )
@@ -51,7 +52,7 @@ func (a *App) StartCancelSubscriber(ctx context.Context) error {
 
 // Stop 释放应用资源，在所有 Server 停止后调用
 func (a *App) Stop(ctx context.Context) error {
-	// 刷新日志缓冲，防止文件输出丢失最后几行
+	redis.Close()
 	_ = logger.ZapLogger().Sync()
 	return a.tracerShutdown(ctx)
 }

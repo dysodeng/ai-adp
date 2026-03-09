@@ -13,12 +13,13 @@ import (
 	"github.com/dysodeng/ai-adp/internal/domain/shared/port"
 	"github.com/dysodeng/ai-adp/internal/infrastructure/agent/adapter"
 	"github.com/dysodeng/ai-adp/internal/infrastructure/agent/cancel"
-	"github.com/dysodeng/ai-adp/internal/infrastructure/cache"
 	"github.com/dysodeng/ai-adp/internal/infrastructure/config"
 	"github.com/dysodeng/ai-adp/internal/infrastructure/logger"
 	"github.com/dysodeng/ai-adp/internal/infrastructure/persistence"
 	"github.com/dysodeng/ai-adp/internal/infrastructure/persistence/migration"
 	"github.com/dysodeng/ai-adp/internal/infrastructure/persistence/transactions"
+	"github.com/dysodeng/ai-adp/internal/infrastructure/pkg/cache"
+	"github.com/dysodeng/ai-adp/internal/infrastructure/pkg/redis"
 	"github.com/dysodeng/ai-adp/internal/infrastructure/server"
 	"github.com/dysodeng/ai-adp/internal/infrastructure/telemetry"
 )
@@ -26,7 +27,8 @@ import (
 // InfrastructureSet wires all infrastructure components
 var InfrastructureSet = wire.NewSet(
 	provideDB,
-	cache.NewRedisClient,
+	provideRedis,
+	cache.NewCache,
 	transactions.NewManager,
 	server.NewHTTPServer,
 	provideLogger,
@@ -71,4 +73,13 @@ func provideTracerShutdown(cfg *config.Config) (telemetry.ShutdownFunc, error) {
 // provideAgentFactory 提供 AgentFactory
 func provideAgentFactory(modelConfigRepo modeldomainrepo.ModelConfigRepository) *adapter.AgentFactory {
 	return adapter.NewAgentFactory(modelConfigRepo)
+}
+
+// provideRedis 提供redis
+func provideRedis(cfg *config.Config) (redis.Client, error) {
+	cli, err := redis.Initialize(cfg)
+	if err != nil {
+		return nil, err
+	}
+	return cli, nil
 }

@@ -2,24 +2,44 @@
 
 app:
   name: ai-adp
-  env: development
+  environment: development
   debug: true
 
+# 服务配置
 server:
   http:
+    enabled: true
+    host: 0.0.0.0
     port: 8080
     read_timeout: 30       # 秒
     write_timeout: 60      # 秒
     shutdown_timeout: 10   # 优雅关闭等待秒数
+  grpc:
+    enabled: true
+    host: 0.0.0.0
+    port: 3000
+    namespace: "app"
+  websocket:
+    enabled: true
+    host: 0.0.0.0
+    port: 4000
+  event:
+    enabled: true
+    driver: "mq"
+  health:
+    enabled: true
+    port: 5000
+
 
 logger:
   level: info              # debug | info | warn | error
   format: console          # json | console（开发环境用 console）
   output_path: stdout      # stdout 或文件路径 var/logs/app.log
 
-jwt:
-  secret: "change-me-in-production"
-  expire_hour: 24
+# 安全配置
+security:
+  jwt:
+    secret: "change-me-in-production"
 
 database:
   host: localhost
@@ -32,12 +52,86 @@ database:
   max_idle_conns: 10
   conn_max_lifetime: 60    # 分钟
 
+# redis配置
 redis:
-  addr: localhost:6379
-  password: ""
-  db: 0
-  pool_size: 10
-  min_idle_conns: 5
+  main:
+    # 模式选择: standalone, cluster, sentinel
+    mode: standalone
+    # 单机模式配置
+    host: 127.0.0.1
+    port: 6379
+    password:
+    db: 0
+    key_prefix:
+    # 集群模式配置
+    cluster:
+      addrs:
+        - "127.0.0.1:7000"
+        - "127.0.0.1:7001"
+        - "127.0.0.1:7002"
+      password:
+    # 哨兵模式配置
+    sentinel:
+      master_name: "mymaster"
+      sentinel_addrs:
+        - "127.0.0.1:26379"
+        - "127.0.0.1:26380"
+        - "127.0.0.1:26381"
+      password:
+      sentinel_password:
+      db: 0
+    # 连接池配置
+    pool:
+      min_idle_conns: 10
+      max_retries: 3
+      pool_size: 100
+
+  cache:
+    mode: standalone
+    host: 127.0.0.1
+    port: 6379
+    password:
+    db: 1
+    key_prefix:
+    cluster:
+      addrs: []
+      password:
+    sentinel:
+      master_name:
+      sentinel_addrs: []
+      password:
+      sentinel_password:
+      db: 1
+    pool:
+      min_idle_conns: 10
+      max_retries: 3
+      pool_size: 100
+
+  mq:
+    mode: standalone
+    host: 127.0.0.1
+    port: 6379
+    password:
+    db: 2
+    key_prefix:
+    cluster:
+      addrs: []
+      password:
+    sentinel:
+      master_name:
+      sentinel_addrs: []
+      password:
+      sentinel_password:
+      db: 2
+    pool:
+      min_idle_conns: 10
+      max_retries: 3
+      pool_size: 100
+
+# 缓存配置
+cache:
+  driver: redis
+  serializer: json
 
 tracing:
   enabled: false
