@@ -5,53 +5,73 @@ import (
 	"fmt"
 	"time"
 
+	serializerIface "github.com/dysodeng/ai-adp/internal/infrastructure/pkg/serializer"
 	"github.com/redis/go-redis/v9"
 )
 
 // Redis redis缓存
 type Redis struct {
-	client    redis.UniversalClient
-	keyPrefix string
+	keyPrefix  string
+	client     redis.UniversalClient
+	serializer serializerIface.Serializer
 }
 
 // NewRedisWithClient 使用redis连接创建缓存实例
-func NewRedisWithClient(redisClient redis.UniversalClient, keyPrefix string) Cache {
+func NewRedisWithClient(redisClient redis.UniversalClient, keyPrefix string, serializer serializerIface.Serializer) Cache {
 	return &Redis{
-		client:    redisClient,
-		keyPrefix: keyPrefix,
+		client:     redisClient,
+		keyPrefix:  keyPrefix,
+		serializer: serializer,
 	}
 }
 
-func (redis *Redis) key(key string) string {
-	if redis.keyPrefix == "" {
+func (r *Redis) key(key string) string {
+	if r.keyPrefix == "" {
 		return key
 	}
-	return fmt.Sprintf("%s:%s", redis.keyPrefix, key)
+	return fmt.Sprintf("%s:%s", r.keyPrefix, key)
 }
 
-func (redis *Redis) IsExist(key string) bool {
-	if v, err := redis.client.Exists(context.Background(), redis.key(key)).Result(); err == nil && v > 0 {
+func (r *Redis) IsExist(key string) bool {
+	if v, err := r.client.Exists(context.Background(), r.key(key)).Result(); err == nil && v > 0 {
 		return true
 	}
 	return false
 }
 
-func (redis *Redis) Get(key string) (string, error) {
-	return redis.client.Get(context.Background(), redis.key(key)).Result()
+func (r *Redis) Get(key string, dest any) error {
+	data, err := r.client.Get(context.Background(), r.key(key)).Result()
+	if err != nil {
+		return err
+	}
+	return r.serializer.Unmarshal(data, dest)
 }
 
-func (redis *Redis) Put(key string, value string, expiration time.Duration) error {
-	_, err := redis.client.Set(context.Background(), redis.key(key), value, expiration).Result()
+func (r *Redis) Put(key string, value any, expiration time.Duration) error {
+	data, err := r.serializer.Marshal(value)
+	if err != nil {
+		return err
+	}
+	_, err = r.client.Set(context.Background(), r.key(key), data, expiration).Result()
 	return err
 }
 
-func (redis *Redis) Delete(key string) error {
-	_, err := redis.client.Del(context.Background(), redis.key(key)).Result()
+func (r *Redis) GetString(key string) (string, error) {
+	return r.client.Get(context.Background(), r.key(key)).Result()
+}
+
+func (r *Redis) PutString(key string, value string, expiration time.Duration) error {
+	_, err := r.client.Set(context.Background(), r.key(key), value, expiration).Result()
+	return err
+}
+
+func (r *Redis) Delete(key string) error {
+	_, err := r.client.Del(context.Background(), r.key(key)).Result()
 	return err
 }
 
 // BatchDelete 批量删除
-func (redis *Redis) BatchDelete(prefix string) error {
+func (r *Redis) BatchDelete(prefix string) error {
 	var cursor uint64
 	var keys []string
 	var err error
@@ -59,13 +79,13 @@ func (redis *Redis) BatchDelete(prefix string) error {
 	ctx := context.Background()
 
 	for {
-		keys, cursor, err = redis.client.Scan(ctx, cursor, prefix+"*", 10).Result()
+		keys, cursor, err = r.client.Scan(ctx, cursor, prefix+"*", 10).Result()
 		if err != nil {
 			return err
 		}
 
 		for _, key := range keys {
-			err = redis.client.Del(ctx, key).Err()
+			err = r.client.Del(ctx, key).Err()
 			if err != nil {
 				fmt.Printf("failed to delete key: %s\n", key)
 			}
