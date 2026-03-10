@@ -2,8 +2,9 @@ package protocol
 
 import (
 	"context"
-	"encoding/json"
 	"net/http"
+
+	"github.com/bytedance/sonic"
 
 	"github.com/dysodeng/ai-adp/internal/domain/agent/executor"
 	"github.com/dysodeng/ai-adp/internal/interfaces/http/dto/response"
@@ -32,13 +33,13 @@ func (a *BlockingAdapter) HandleExecution(ctx context.Context, agentExecutor exe
 
 	if err := agentExecutor.Err(); err != nil {
 		resp := response.Fail(ctx, err.Error(), response.CodeFail)
-		return json.NewEncoder(a.w).Encode(resp)
+		return sonic.ConfigDefault.NewEncoder(a.w).Encode(resp)
 	}
 
 	output := agentExecutor.GetOutput()
 	if output == nil {
 		resp := response.Fail(ctx, "execution completed but no output produced", response.CodeInternalServerError)
-		return json.NewEncoder(a.w).Encode(resp)
+		return sonic.ConfigDefault.NewEncoder(a.w).Encode(resp)
 	}
 
 	result := map[string]any{
@@ -53,7 +54,7 @@ func (a *BlockingAdapter) HandleExecution(ctx context.Context, agentExecutor exe
 	}
 
 	resp := response.Success(ctx, result)
-	return json.NewEncoder(a.w).Encode(resp)
+	return sonic.ConfigDefault.NewEncoder(a.w).Encode(resp)
 }
 
 // Close 关闭适配器（无操作）

@@ -2,9 +2,9 @@ package adapter
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 
+	"github.com/bytedance/sonic"
 	einotool "github.com/cloudwego/eino/components/tool"
 	"github.com/cloudwego/eino/schema"
 	"github.com/eino-contrib/jsonschema"
@@ -27,13 +27,13 @@ func (a *ToolAdapter) Info(ctx context.Context) (*schema.ToolInfo, error) {
 	var paramsOneOf *schema.ParamsOneOf
 	if inputSchema != nil {
 		// 将 map[string]interface{} 转换为 jsonschema.Schema
-		jsonSchemaBytes, err := json.Marshal(inputSchema)
+		jsonSchemaBytes, err := sonic.Marshal(inputSchema)
 		if err != nil {
 			return nil, fmt.Errorf("failed to marshal input schema: %w", err)
 		}
 
 		var jsonSchemaObj jsonschema.Schema
-		if err := json.Unmarshal(jsonSchemaBytes, &jsonSchemaObj); err != nil {
+		if err = sonic.Unmarshal(jsonSchemaBytes, &jsonSchemaObj); err != nil {
 			return nil, fmt.Errorf("failed to unmarshal to jsonschema.Schema: %w", err)
 		}
 
@@ -50,7 +50,7 @@ func (a *ToolAdapter) Info(ctx context.Context) (*schema.ToolInfo, error) {
 func (a *ToolAdapter) InvokableRun(ctx context.Context, argumentsInJSON string, opts ...einotool.Option) (string, error) {
 	// 将 JSON 字符串解析为 map
 	var input map[string]any
-	if err := json.Unmarshal([]byte(argumentsInJSON), &input); err != nil {
+	if err := sonic.Unmarshal([]byte(argumentsInJSON), &input); err != nil {
 		return "", fmt.Errorf("failed to parse arguments: %w", err)
 	}
 

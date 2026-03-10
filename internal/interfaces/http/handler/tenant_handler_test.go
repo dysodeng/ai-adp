@@ -2,18 +2,19 @@ package handler_test
 
 import (
 	"bytes"
-	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
+	"github.com/bytedance/sonic"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
+
 	"github.com/dysodeng/ai-adp/internal/application/tenant/dto"
-	"github.com/dysodeng/ai-adp/internal/interfaces/http/handler"
 	mocksvc "github.com/dysodeng/ai-adp/internal/application/tenant/service/mock"
+	"github.com/dysodeng/ai-adp/internal/interfaces/http/handler"
 )
 
 func TestTenantHandler_Create(t *testing.T) {
@@ -33,7 +34,7 @@ func TestTenantHandler_Create(t *testing.T) {
 	r := gin.New()
 	r.POST("/tenants", h.Create)
 
-	body, _ := json.Marshal(map[string]string{"name": "Acme", "email": "admin@acme.com"})
+	body, _ := sonic.Marshal(map[string]string{"name": "Acme", "email": "admin@acme.com"})
 	w := httptest.NewRecorder()
 	req, _ := http.NewRequest(http.MethodPost, "/tenants", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")

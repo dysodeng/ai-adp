@@ -3,6 +3,7 @@ package valueobject
 import (
 	"encoding/json"
 
+	"github.com/bytedance/sonic"
 	"github.com/google/uuid"
 )
 
@@ -26,13 +27,13 @@ type ToolConfig struct {
 
 // ToJSON 序列化为 JSON 字节
 func (c *AppConfig) ToJSON() ([]byte, error) {
-	return json.Marshal(c)
+	return sonic.Marshal(c)
 }
 
 // AppConfigFromJSON 从 JSON 字节反序列化
 func AppConfigFromJSON(data []byte) (*AppConfig, error) {
 	var c AppConfig
-	if err := json.Unmarshal(data, &c); err != nil {
+	if err := sonic.Unmarshal(data, &c); err != nil {
 		return nil, err
 	}
 	return &c, nil

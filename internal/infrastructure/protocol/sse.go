@@ -2,10 +2,11 @@ package protocol
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"time"
+
+	"github.com/bytedance/sonic"
 
 	"github.com/dysodeng/ai-adp/internal/domain/agent/executor"
 	"github.com/dysodeng/ai-adp/internal/domain/agent/model"
@@ -57,7 +58,7 @@ func (a *SSEAdapter) sendEvent(event *model.Event) error {
 		return fmt.Errorf("adapter is closed")
 	}
 
-	data, err := json.Marshal(event)
+	data, err := sonic.Marshal(event)
 	if err != nil {
 		return fmt.Errorf("marshal event failed: %w", err)
 	}
