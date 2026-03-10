@@ -13,7 +13,7 @@ type MemoryTaskRegistry struct {
 }
 
 // NewMemoryTaskRegistry 创建内存任务注册表
-func NewMemoryTaskRegistry() *MemoryTaskRegistry {
+func NewMemoryTaskRegistry() executor.TaskRegistry {
 	return &MemoryTaskRegistry{}
 }
 

@@ -7,7 +7,7 @@ import (
 
 	chatdto "github.com/dysodeng/ai-adp/internal/application/chat/dto"
 	chatservice "github.com/dysodeng/ai-adp/internal/application/chat/service"
-	"github.com/dysodeng/ai-adp/internal/infrastructure/logger"
+	"github.com/dysodeng/ai-adp/internal/infrastructure/pkg/logger"
 	"github.com/dysodeng/ai-adp/internal/infrastructure/protocol"
 	"github.com/dysodeng/ai-adp/internal/interfaces/http/dto/request"
 	"github.com/dysodeng/ai-adp/internal/interfaces/http/dto/response"

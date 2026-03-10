@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 
+	"github.com/dysodeng/ai-adp/internal/infrastructure/persistence/transactions"
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 
@@ -14,24 +15,24 @@ import (
 	"github.com/dysodeng/ai-adp/internal/infrastructure/persistence/entity"
 )
 
-var _ domainrepo.AppRepository = (*AppRepositoryImpl)(nil)
+var _ domainrepo.AppRepository = (*appRepository)(nil)
 
-type AppRepositoryImpl struct {
-	db *gorm.DB
+type appRepository struct {
+	txManger transactions.TransactionManager
 }
 
-func NewAppRepository(db *gorm.DB) *AppRepositoryImpl {
-	return &AppRepositoryImpl{db: db}
+func NewAppRepository(txManger transactions.TransactionManager) domainrepo.AppRepository {
+	return &appRepository{txManger: txManger}
 }
 
-func (r *AppRepositoryImpl) SaveApp(ctx context.Context, app *appmodel.App) error {
+func (r *appRepository) SaveApp(ctx context.Context, app *appmodel.App) error {
 	e := toAppEntity(app)
-	return r.db.WithContext(ctx).Save(&e).Error
+	return r.txManger.GetTx(ctx).Save(&e).Error
 }
 
-func (r *AppRepositoryImpl) FindAppByID(ctx context.Context, id uuid.UUID) (*appmodel.App, error) {
+func (r *appRepository) FindAppByID(ctx context.Context, id uuid.UUID) (*appmodel.App, error) {
 	var e entity.AppEntity
-	err := r.db.WithContext(ctx).First(&e, "id = ?", id).Error
+	err := r.txManger.GetTx(ctx).First(&e, "id = ?", id).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, apperrors.ErrAppNotFound
 	}
@@ -41,9 +42,9 @@ func (r *AppRepositoryImpl) FindAppByID(ctx context.Context, id uuid.UUID) (*app
 	return toAppDomain(&e), nil
 }
 
-func (r *AppRepositoryImpl) FindAppsByTenant(ctx context.Context, tenantID uuid.UUID) ([]*appmodel.App, error) {
+func (r *appRepository) FindAppsByTenant(ctx context.Context, tenantID uuid.UUID) ([]*appmodel.App, error) {
 	var entities []entity.AppEntity
-	err := r.db.WithContext(ctx).
+	err := r.txManger.GetTx(ctx).
 		Where("tenant_id = ?", tenantID).
 		Order("created_at DESC").
 		Find(&entities).Error
@@ -57,21 +58,21 @@ func (r *AppRepositoryImpl) FindAppsByTenant(ctx context.Context, tenantID uuid.
 	return result, nil
 }
 
-func (r *AppRepositoryImpl) DeleteApp(ctx context.Context, id uuid.UUID) error {
-	return r.db.WithContext(ctx).Delete(&entity.AppEntity{}, "id = ?", id).Error
+func (r *appRepository) DeleteApp(ctx context.Context, id uuid.UUID) error {
+	return r.txManger.GetTx(ctx).Delete(&entity.AppEntity{}, "id = ?", id).Error
 }
 
-func (r *AppRepositoryImpl) SaveVersion(ctx context.Context, version *appmodel.AppVersion) error {
+func (r *appRepository) SaveVersion(ctx context.Context, version *appmodel.AppVersion) error {
 	e, err := toVersionEntity(version)
 	if err != nil {
 		return err
 	}
-	return r.db.WithContext(ctx).Save(&e).Error
+	return r.txManger.GetTx(ctx).Save(&e).Error
 }
 
-func (r *AppRepositoryImpl) FindVersionByID(ctx context.Context, id uuid.UUID) (*appmodel.AppVersion, error) {
+func (r *appRepository) FindVersionByID(ctx context.Context, id uuid.UUID) (*appmodel.AppVersion, error) {
 	var e entity.AppVersionEntity
-	err := r.db.WithContext(ctx).First(&e, "id = ?", id).Error
+	err := r.txManger.GetTx(ctx).First(&e, "id = ?", id).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, apperrors.ErrVersionNotFound
 	}
@@ -81,9 +82,9 @@ func (r *AppRepositoryImpl) FindVersionByID(ctx context.Context, id uuid.UUID) (
 	return toVersionDomain(&e)
 }
 
-func (r *AppRepositoryImpl) FindPublishedVersion(ctx context.Context, appID uuid.UUID) (*appmodel.AppVersion, error) {
+func (r *appRepository) FindPublishedVersion(ctx context.Context, appID uuid.UUID) (*appmodel.AppVersion, error) {
 	var e entity.AppVersionEntity
-	err := r.db.WithContext(ctx).
+	err := r.txManger.GetTx(ctx).
 		Where("app_id = ? AND status = ?", appID, valueobject.VersionStatusPublished).
 		First(&e).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -95,9 +96,9 @@ func (r *AppRepositoryImpl) FindPublishedVersion(ctx context.Context, appID uuid
 	return toVersionDomain(&e)
 }
 
-func (r *AppRepositoryImpl) FindDraftVersion(ctx context.Context, appID uuid.UUID) (*appmodel.AppVersion, error) {
+func (r *appRepository) FindDraftVersion(ctx context.Context, appID uuid.UUID) (*appmodel.AppVersion, error) {
 	var e entity.AppVersionEntity
-	err := r.db.WithContext(ctx).
+	err := r.txManger.GetTx(ctx).
 		Where("app_id = ? AND status = ?", appID, valueobject.VersionStatusDraft).
 		First(&e).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -109,9 +110,9 @@ func (r *AppRepositoryImpl) FindDraftVersion(ctx context.Context, appID uuid.UUI
 	return toVersionDomain(&e)
 }
 
-func (r *AppRepositoryImpl) FindVersionsByApp(ctx context.Context, appID uuid.UUID) ([]*appmodel.AppVersion, error) {
+func (r *appRepository) FindVersionsByApp(ctx context.Context, appID uuid.UUID) ([]*appmodel.AppVersion, error) {
 	var entities []entity.AppVersionEntity
-	err := r.db.WithContext(ctx).
+	err := r.txManger.GetTx(ctx).
 		Where("app_id = ?", appID).
 		Order("version DESC").
 		Find(&entities).Error
@@ -121,9 +122,9 @@ func (r *AppRepositoryImpl) FindVersionsByApp(ctx context.Context, appID uuid.UU
 	return toVersionDomainList(entities)
 }
 
-func (r *AppRepositoryImpl) FindVersionsByStatus(ctx context.Context, appID uuid.UUID, status valueobject.VersionStatus) ([]*appmodel.AppVersion, error) {
+func (r *appRepository) FindVersionsByStatus(ctx context.Context, appID uuid.UUID, status valueobject.VersionStatus) ([]*appmodel.AppVersion, error) {
 	var entities []entity.AppVersionEntity
-	err := r.db.WithContext(ctx).
+	err := r.txManger.GetTx(ctx).
 		Where("app_id = ? AND status = ?", appID, status).
 		Order("version DESC").
 		Find(&entities).Error
@@ -133,14 +134,14 @@ func (r *AppRepositoryImpl) FindVersionsByStatus(ctx context.Context, appID uuid
 	return toVersionDomainList(entities)
 }
 
-func (r *AppRepositoryImpl) SaveApiKey(ctx context.Context, apiKey *appmodel.AppApiKey) error {
+func (r *appRepository) SaveApiKey(ctx context.Context, apiKey *appmodel.AppApiKey) error {
 	e := toApiKeyEntity(apiKey)
-	return r.db.WithContext(ctx).Save(&e).Error
+	return r.txManger.GetTx(ctx).Save(&e).Error
 }
 
-func (r *AppRepositoryImpl) FindApiKeyByKey(ctx context.Context, key string) (*appmodel.AppApiKey, error) {
+func (r *appRepository) FindApiKeyByKey(ctx context.Context, key string) (*appmodel.AppApiKey, error) {
 	var e entity.AppApiKeyEntity
-	err := r.db.WithContext(ctx).
+	err := r.txManger.GetTx(ctx).
 		Where("api_key = ? AND is_active = ?", key, true).
 		First(&e).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -152,9 +153,9 @@ func (r *AppRepositoryImpl) FindApiKeyByKey(ctx context.Context, key string) (*a
 	return toApiKeyDomain(&e), nil
 }
 
-func (r *AppRepositoryImpl) FindApiKeysByApp(ctx context.Context, appID uuid.UUID) ([]*appmodel.AppApiKey, error) {
+func (r *appRepository) FindApiKeysByApp(ctx context.Context, appID uuid.UUID) ([]*appmodel.AppApiKey, error) {
 	var entities []entity.AppApiKeyEntity
-	err := r.db.WithContext(ctx).
+	err := r.txManger.GetTx(ctx).
 		Where("app_id = ?", appID).
 		Order("created_at DESC").
 		Find(&entities).Error
@@ -168,13 +169,13 @@ func (r *AppRepositoryImpl) FindApiKeysByApp(ctx context.Context, appID uuid.UUI
 	return result, nil
 }
 
-func (r *AppRepositoryImpl) DeleteApiKey(ctx context.Context, id uuid.UUID) error {
-	return r.db.WithContext(ctx).Delete(&entity.AppApiKeyEntity{}, "id = ?", id).Error
+func (r *appRepository) DeleteApiKey(ctx context.Context, id uuid.UUID) error {
+	return r.txManger.GetTx(ctx).Delete(&entity.AppApiKeyEntity{}, "id = ?", id).Error
 }
 
-func (r *AppRepositoryImpl) FindAppWithPublishedVersion(ctx context.Context, appID uuid.UUID) (*appmodel.App, *appmodel.AppVersion, error) {
+func (r *appRepository) FindAppWithPublishedVersion(ctx context.Context, appID uuid.UUID) (*appmodel.App, *appmodel.AppVersion, error) {
 	var appEntity entity.AppEntity
-	err := r.db.WithContext(ctx).First(&appEntity, "id = ?", appID).Error
+	err := r.txManger.GetTx(ctx).First(&appEntity, "id = ?", appID).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, nil, apperrors.ErrAppNotFound
 	}
@@ -183,7 +184,7 @@ func (r *AppRepositoryImpl) FindAppWithPublishedVersion(ctx context.Context, app
 	}
 
 	var versionEntity entity.AppVersionEntity
-	err = r.db.WithContext(ctx).
+	err = r.txManger.GetTx(ctx).
 		Where("app_id = ? AND status = ?", appID, valueobject.VersionStatusPublished).
 		First(&versionEntity).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -201,9 +202,9 @@ func (r *AppRepositoryImpl) FindAppWithPublishedVersion(ctx context.Context, app
 	return app, version, nil
 }
 
-func (r *AppRepositoryImpl) FindAppByApiKey(ctx context.Context, key string) (*appmodel.App, *appmodel.AppVersion, error) {
+func (r *appRepository) FindAppByApiKey(ctx context.Context, key string) (*appmodel.App, *appmodel.AppVersion, error) {
 	var apiKeyEntity entity.AppApiKeyEntity
-	err := r.db.WithContext(ctx).
+	err := r.txManger.GetTx(ctx).
 		Where("api_key = ? AND is_active = ?", key, true).
 		First(&apiKeyEntity).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {

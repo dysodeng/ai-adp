@@ -6,7 +6,7 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"github.com/dysodeng/ai-adp/internal/domain/agent/executor"
-	"github.com/dysodeng/ai-adp/internal/infrastructure/logger"
+	"github.com/dysodeng/ai-adp/internal/infrastructure/pkg/logger"
 	"github.com/dysodeng/ai-adp/internal/interfaces/http/dto/response"
 )
 

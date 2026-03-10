@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 
+	"github.com/dysodeng/ai-adp/internal/infrastructure/persistence/transactions"
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 
@@ -15,25 +16,25 @@ import (
 )
 
 // compile-time interface check
-var _ domainrepo.ModelConfigRepository = (*ModelConfigRepositoryImpl)(nil)
+var _ domainrepo.ModelConfigRepository = (*modelConfigRepository)(nil)
 
 // ModelConfigRepositoryImpl GORM-based AI 模型配置仓储
-type ModelConfigRepositoryImpl struct {
-	db *gorm.DB
+type modelConfigRepository struct {
+	txManger transactions.TransactionManager
 }
 
-func NewModelConfigRepository(db *gorm.DB) *ModelConfigRepositoryImpl {
-	return &ModelConfigRepositoryImpl{db: db}
+func NewModelConfigRepository(txManger transactions.TransactionManager) domainrepo.ModelConfigRepository {
+	return &modelConfigRepository{txManger: txManger}
 }
 
-func (r *ModelConfigRepositoryImpl) Save(ctx context.Context, m *modelconfig.ModelConfig) error {
+func (r *modelConfigRepository) Save(ctx context.Context, m *modelconfig.ModelConfig) error {
 	e := toEntity(m)
-	return r.db.WithContext(ctx).Save(&e).Error
+	return r.txManger.GetTx(ctx).Save(&e).Error
 }
 
-func (r *ModelConfigRepositoryImpl) FindByID(ctx context.Context, id uuid.UUID) (*modelconfig.ModelConfig, error) {
+func (r *modelConfigRepository) FindByID(ctx context.Context, id uuid.UUID) (*modelconfig.ModelConfig, error) {
 	var e entity.ModelConfigEntity
-	err := r.db.WithContext(ctx).First(&e, "id = ?", id).Error
+	err := r.txManger.GetTx(ctx).First(&e, "id = ?", id).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, domainerrors.ErrModelConfigNotFound
 	}
@@ -43,9 +44,9 @@ func (r *ModelConfigRepositoryImpl) FindByID(ctx context.Context, id uuid.UUID) 
 	return toDomain(&e), nil
 }
 
-func (r *ModelConfigRepositoryImpl) FindDefault(ctx context.Context, capability valueobject.ModelCapability) (*modelconfig.ModelConfig, error) {
+func (r *modelConfigRepository) FindDefault(ctx context.Context, capability valueobject.ModelCapability) (*modelconfig.ModelConfig, error) {
 	var e entity.ModelConfigEntity
-	err := r.db.WithContext(ctx).
+	err := r.txManger.GetTx(ctx).
 		Where("capability = ? AND is_default = true AND enabled = true", capability).
 		First(&e).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -57,9 +58,9 @@ func (r *ModelConfigRepositoryImpl) FindDefault(ctx context.Context, capability 
 	return toDomain(&e), nil
 }
 
-func (r *ModelConfigRepositoryImpl) FindAllByCapability(ctx context.Context, capability valueobject.ModelCapability) ([]*modelconfig.ModelConfig, error) {
+func (r *modelConfigRepository) FindAllByCapability(ctx context.Context, capability valueobject.ModelCapability) ([]*modelconfig.ModelConfig, error) {
 	var entities []entity.ModelConfigEntity
-	err := r.db.WithContext(ctx).
+	err := r.txManger.GetTx(ctx).
 		Where("capability = ? AND enabled = true", capability).
 		Order("is_default DESC, created_at ASC").
 		Find(&entities).Error
@@ -73,9 +74,9 @@ func (r *ModelConfigRepositoryImpl) FindAllByCapability(ctx context.Context, cap
 	return result, nil
 }
 
-func (r *ModelConfigRepositoryImpl) FindAll(ctx context.Context) ([]*modelconfig.ModelConfig, error) {
+func (r *modelConfigRepository) FindAll(ctx context.Context) ([]*modelconfig.ModelConfig, error) {
 	var entities []entity.ModelConfigEntity
-	err := r.db.WithContext(ctx).Order("capability, is_default DESC, created_at ASC").Find(&entities).Error
+	err := r.txManger.GetTx(ctx).Order("capability, is_default DESC, created_at ASC").Find(&entities).Error
 	if err != nil {
 		return nil, err
 	}
@@ -86,8 +87,8 @@ func (r *ModelConfigRepositoryImpl) FindAll(ctx context.Context) ([]*modelconfig
 	return result, nil
 }
 
-func (r *ModelConfigRepositoryImpl) Delete(ctx context.Context, id uuid.UUID) error {
-	return r.db.WithContext(ctx).Delete(&entity.ModelConfigEntity{}, "id = ?", id).Error
+func (r *modelConfigRepository) Delete(ctx context.Context, id uuid.UUID) error {
+	return r.txManger.GetTx(ctx).Delete(&entity.ModelConfigEntity{}, "id = ?", id).Error
 }
 
 // toEntity 将领域对象转换为 GORM 实体

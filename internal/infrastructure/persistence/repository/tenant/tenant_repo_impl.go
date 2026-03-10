@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 
+	"github.com/dysodeng/ai-adp/internal/infrastructure/persistence/transactions"
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 
@@ -16,17 +17,17 @@ import (
 )
 
 // Ensure interface is implemented
-var _ domainrepo.TenantRepository = (*TenantRepositoryImpl)(nil)
+var _ domainrepo.TenantRepository = (*tenantRepository)(nil)
 
-type TenantRepositoryImpl struct {
-	db *gorm.DB
+type tenantRepository struct {
+	txManger transactions.TransactionManager
 }
 
-func NewTenantRepository(db *gorm.DB) *TenantRepositoryImpl {
-	return &TenantRepositoryImpl{db: db}
+func NewTenantRepository(txManger transactions.TransactionManager) domainrepo.TenantRepository {
+	return &tenantRepository{txManger: txManger}
 }
 
-func (r *TenantRepositoryImpl) Save(ctx context.Context, tenant *domainmodel.Tenant) error {
+func (r *tenantRepository) Save(ctx context.Context, tenant *domainmodel.Tenant) error {
 	e := &entity.TenantEntity{}
 	if id := tenant.ID(); id != uuid.Nil {
 		e.ID = id
@@ -34,12 +35,12 @@ func (r *TenantRepositoryImpl) Save(ctx context.Context, tenant *domainmodel.Ten
 	e.Name = tenant.Name()
 	e.Email = tenant.Email()
 	e.Status = string(tenant.Status())
-	return r.db.WithContext(ctx).Save(e).Error
+	return r.txManger.GetTx(ctx).Save(e).Error
 }
 
-func (r *TenantRepositoryImpl) FindByID(ctx context.Context, id string) (*domainmodel.Tenant, error) {
+func (r *tenantRepository) FindByID(ctx context.Context, id string) (*domainmodel.Tenant, error) {
 	var e entity.TenantEntity
-	if err := r.db.WithContext(ctx).First(&e, "id = ?", id).Error; err != nil {
+	if err := r.txManger.GetTx(ctx).First(&e, "id = ?", id).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, sharederrors.New("TENANT_NOT_FOUND", "tenant not found")
 		}
@@ -48,11 +49,11 @@ func (r *TenantRepositoryImpl) FindByID(ctx context.Context, id string) (*domain
 	return domainmodel.Reconstitute(e.ID, e.Name, e.Email, tenantvo.TenantStatus(e.Status)), nil
 }
 
-func (r *TenantRepositoryImpl) FindAll(ctx context.Context, pagination valueobject.Pagination) ([]*domainmodel.Tenant, int64, error) {
+func (r *tenantRepository) FindAll(ctx context.Context, pagination valueobject.Pagination) ([]*domainmodel.Tenant, int64, error) {
 	var entities []entity.TenantEntity
 	var total int64
 
-	db := r.db.WithContext(ctx).Model(&entity.TenantEntity{})
+	db := r.txManger.GetTx(ctx).Model(&entity.TenantEntity{})
 	if err := db.Count(&total).Error; err != nil {
 		return nil, 0, err
 	}
@@ -67,6 +68,6 @@ func (r *TenantRepositoryImpl) FindAll(ctx context.Context, pagination valueobje
 	return tenants, total, nil
 }
 
-func (r *TenantRepositoryImpl) Delete(ctx context.Context, id string) error {
-	return r.db.WithContext(ctx).Delete(&entity.TenantEntity{}, "id = ?", id).Error
+func (r *tenantRepository) Delete(ctx context.Context, id string) error {
+	return r.txManger.GetTx(ctx).Delete(&entity.TenantEntity{}, "id = ?", id).Error
 }

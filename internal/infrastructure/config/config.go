@@ -5,36 +5,24 @@ import (
 	"github.com/spf13/viper"
 )
 
+const (
+	VarPath  string = "var"
+	LogPath         = VarPath + "/logs"
+	TempPath        = VarPath + "/tmp"
+)
+
+var GlobalConfig *Config
+
 // Config 应用全局配置
 type Config struct {
 	App      App            `mapstructure:"app"`
 	Server   Server         `mapstructure:"server"`
 	Security Security       `mapstructure:"security"`
-	Logger   LoggerConfig   `mapstructure:"logger"`
 	Database DatabaseConfig `mapstructure:"database"`
 	Redis    Redis          `mapstructure:"redis"`
 	Cache    Cache          `mapstructure:"cache"`
+	Monitor  Monitor        `mapstructure:"monitor"`
 	Tracing  TracingConfig  `mapstructure:"tracing"`
-}
-
-// LoggerConfig Zap 日志配置
-type LoggerConfig struct {
-	Level      string `mapstructure:"level"`       // debug | info | warn | error
-	Format     string `mapstructure:"format"`      // json | console
-	OutputPath string `mapstructure:"output_path"` // stdout 或文件路径
-}
-
-// DatabaseConfig PostgreSQL 数据库配置
-type DatabaseConfig struct {
-	Host            string `mapstructure:"host"`
-	Port            int    `mapstructure:"port"`
-	Name            string `mapstructure:"name"`
-	User            string `mapstructure:"user"`
-	Password        string `mapstructure:"password"`
-	SSLMode         string `mapstructure:"ssl_mode"`
-	MaxOpenConns    int    `mapstructure:"max_open_conns"`    // 最大打开连接数，默认 100
-	MaxIdleConns    int    `mapstructure:"max_idle_conns"`    // 最大空闲连接数，默认 10
-	ConnMaxLifetime int    `mapstructure:"conn_max_lifetime"` // 连接最大存活分钟数，默认 60
 }
 
 // TracingConfig OpenTelemetry 分布式追踪配置
@@ -83,6 +71,14 @@ func Load(path string) (*Config, error) {
 		}
 	}
 
+	var databaseConfig DatabaseConfig
+	if database := v.Sub("database"); database != nil {
+		databaseBindEnv(database)
+		if err := database.Unmarshal(&databaseConfig); err != nil {
+			return nil, err
+		}
+	}
+
 	var redisConfig Redis
 	if redis := v.Sub("redis"); redis != nil {
 		redisBindEnv(redis)
@@ -95,6 +91,14 @@ func Load(path string) (*Config, error) {
 	if cache := v.Sub("cache"); cache != nil {
 		cacheBindEnv(cache)
 		if err := cache.Unmarshal(&cacheConfig); err != nil {
+			return nil, err
+		}
+	}
+
+	var monitorConfig Monitor
+	if monitor := v.Sub("monitor"); monitor != nil {
+		monitorBindEnv(monitor)
+		if err := monitor.Unmarshal(&monitorConfig); err != nil {
 			return nil, err
 		}
 	}
@@ -113,8 +117,12 @@ func Load(path string) (*Config, error) {
 	cfg.App = appConfig
 	cfg.Server = serverConfig
 	cfg.Security = securityConfig
+	cfg.Database = databaseConfig
 	cfg.Redis = redisConfig
+	cfg.Monitor = monitorConfig
 	cfg.Cache = cacheConfig
+
+	GlobalConfig = &cfg
 
 	return &cfg, nil
 }
@@ -132,9 +140,6 @@ func bindEnvKeys(v *viper.Viper) {
 		"tracing.endpoint":     "TRACING_ENDPOINT",
 		"tracing.service_name": "TRACING_SERVICE_NAME",
 		"tracing.sample_rate":  "TRACING_SAMPLE_RATE",
-		"logger.level":         "LOGGER_LEVEL",
-		"logger.format":        "LOGGER_FORMAT",
-		"logger.output_path":   "LOGGER_OUTPUT_PATH",
 	}
 	for key, env := range envBindings {
 		_ = v.BindEnv(key, env)
@@ -142,13 +147,6 @@ func bindEnvKeys(v *viper.Viper) {
 }
 
 func setDefaults(v *viper.Viper) {
-	v.SetDefault("logger.level", "info")
-	v.SetDefault("logger.format", "json")
-	v.SetDefault("logger.output_path", "stdout")
-	v.SetDefault("database.ssl_mode", "disable")
-	v.SetDefault("database.max_open_conns", 100)
-	v.SetDefault("database.max_idle_conns", 10)
-	v.SetDefault("database.conn_max_lifetime", 60)
 	v.SetDefault("tracing.enabled", false)
 	v.SetDefault("tracing.sample_rate", 1.0)
 }

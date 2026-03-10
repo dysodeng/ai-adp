@@ -1,0 +1,73 @@
+package middleware
+
+import (
+	"context"
+	"fmt"
+
+	"github.com/gin-gonic/gin"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/propagation"
+	semconv "go.opentelemetry.io/otel/semconv/v1.12.0"
+	oteltrace "go.opentelemetry.io/otel/trace"
+
+	"github.com/dysodeng/ai-adp/internal/infrastructure/config"
+	"github.com/dysodeng/ai-adp/internal/infrastructure/pkg/telemetry/trace"
+)
+
+// StartTrace trace
+func StartTrace() gin.HandlerFunc {
+	return func(ctx *gin.Context) {
+		savedCtx := ctx.Request.Context()
+		defer func() {
+			ctx.Request = ctx.Request.WithContext(savedCtx)
+		}()
+
+		traceIDByHex := ctx.Request.Header.Get("X-Trace-Id")
+		spanIDByHex := ctx.Request.Header.Get("X-Span-Id")
+
+		var newCtx context.Context
+		if traceIDByHex != "" {
+			traceID, _ := oteltrace.TraceIDFromHex(traceIDByHex)
+			spanID, _ := oteltrace.SpanIDFromHex(spanIDByHex)
+			spanCtx := oteltrace.NewSpanContext(oteltrace.SpanContextConfig{
+				TraceID:    traceID,
+				SpanID:     spanID,
+				TraceFlags: oteltrace.FlagsSampled,
+				Remote:     true,
+			})
+			carrier := propagation.HeaderCarrier{}
+			carrier.Set("X-Trace-Id", traceIDByHex)
+			newCtx = oteltrace.ContextWithRemoteSpanContext(otel.GetTextMapPropagator().Extract(savedCtx, carrier), spanCtx)
+		} else {
+			newCtx = otel.GetTextMapPropagator().Extract(savedCtx, propagation.HeaderCarrier(ctx.Request.Header))
+		}
+
+		opts := []oteltrace.SpanStartOption{
+			oteltrace.WithAttributes(semconv.NetAttributesFromHTTPRequest("tcp", ctx.Request)...),
+			oteltrace.WithAttributes(semconv.EndUserAttributesFromHTTPRequest(ctx.Request)...),
+			oteltrace.WithAttributes(semconv.HTTPServerAttributesFromHTTPRequest(config.GlobalConfig.App.Name, ctx.FullPath(), ctx.Request)...),
+			oteltrace.WithSpanKind(oteltrace.SpanKindServer),
+		}
+		spanName := ctx.FullPath()
+		if spanName == "" {
+			spanName = fmt.Sprintf("HTTP %s route not found", ctx.Request.Method)
+		}
+		spanCtx, span := trace.Tracer().Start(newCtx, spanName, opts...)
+		defer span.End()
+
+		ctx.Request = ctx.Request.WithContext(spanCtx)
+		ctx.Set("X-Trace-Id", span.SpanContext().TraceID().String())
+
+		ctx.Next()
+
+		status := ctx.Writer.Status()
+		attrs := semconv.HTTPAttributesFromHTTPStatusCode(status)
+		spanStatus, spanMessage := semconv.SpanStatusFromHTTPStatusCodeAndSpanKind(status, oteltrace.SpanKindServer)
+		span.SetAttributes(attrs...)
+		span.SetStatus(spanStatus, spanMessage)
+		if len(ctx.Errors) > 0 {
+			span.SetAttributes(attribute.String("gin.errors", ctx.Errors.String()))
+		}
+	}
+}

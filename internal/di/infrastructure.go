@@ -1,85 +1,34 @@
 package di
 
 import (
-	"fmt"
-
 	"github.com/google/wire"
-	"go.uber.org/zap"
-	"gorm.io/gorm"
 
-	"github.com/dysodeng/ai-adp/internal/domain/agent/executor"
-	agentservice "github.com/dysodeng/ai-adp/internal/domain/agent/service"
-	modeldomainrepo "github.com/dysodeng/ai-adp/internal/domain/model/repository"
+	"github.com/dysodeng/ai-adp/internal/di/provider"
+	agentService "github.com/dysodeng/ai-adp/internal/domain/agent/service"
 	"github.com/dysodeng/ai-adp/internal/domain/shared/port"
-	"github.com/dysodeng/ai-adp/internal/infrastructure/agent/adapter"
 	"github.com/dysodeng/ai-adp/internal/infrastructure/agent/cancel"
-	"github.com/dysodeng/ai-adp/internal/infrastructure/config"
-	"github.com/dysodeng/ai-adp/internal/infrastructure/logger"
-	"github.com/dysodeng/ai-adp/internal/infrastructure/persistence"
-	"github.com/dysodeng/ai-adp/internal/infrastructure/persistence/migration"
-	"github.com/dysodeng/ai-adp/internal/infrastructure/persistence/transactions"
-	"github.com/dysodeng/ai-adp/internal/infrastructure/pkg/cache"
-	"github.com/dysodeng/ai-adp/internal/infrastructure/pkg/redis"
-	"github.com/dysodeng/ai-adp/internal/infrastructure/server"
-	"github.com/dysodeng/ai-adp/internal/infrastructure/telemetry"
+	"github.com/dysodeng/ai-adp/internal/interfaces/http"
 )
 
 // InfrastructureSet wires all infrastructure components
 var InfrastructureSet = wire.NewSet(
-	provideDB,
-	provideRedis,
-	cache.NewCache,
-	transactions.NewManager,
-	server.NewHTTPServer,
-	provideLogger,
-	provideTracerShutdown,
+	provider.ProvideConfig,
+	provider.ProvideMonitor,
+	provider.ProvideLogger,
+	provider.ProvideDB,
+	provider.ProvideRedis,
+	provider.ProvideCache,
 	port.NewMockToolService,
-	agentservice.NewAgentBuilder,
-	provideAgentFactory,
+	agentService.NewAgentBuilder,
+	provider.ProvideAgentFactory,
 	// 取消能力组件
 	cancel.NewMemoryTaskRegistry,
-	wire.Bind(new(executor.TaskRegistry), new(*cancel.MemoryTaskRegistry)),
 	cancel.NewRedisCancelBroadcaster,
-	wire.Bind(new(executor.CancelBroadcaster), new(*cancel.RedisCancelBroadcaster)),
 )
 
-// provideDB 初始化 DB 连接并自动执行迁移
-func provideDB(cfg *config.Config) (*gorm.DB, error) {
-	db, err := persistence.NewDB(cfg)
-	if err != nil {
-		return nil, err
-	}
-	if err := migration.AutoMigrate(db); err != nil {
-		return nil, fmt.Errorf("auto migrate failed: %w", err)
-	}
-	return db, nil
-}
-
-// provideLogger 初始化全局 logger 并返回底层 *zap.Logger
-func provideLogger(cfg *config.Config) (*zap.Logger, error) {
-	if err := logger.InitLogger(cfg.Logger); err != nil {
-		return nil, err
-	}
-	return logger.ZapLogger(), nil
-}
-
-// provideTracerShutdown initialises OpenTelemetry tracing (sets the global provider)
-// and returns the shutdown function to be called on application exit.
-func provideTracerShutdown(cfg *config.Config) (telemetry.ShutdownFunc, error) {
-	_, shutdown, err := telemetry.NewTracerProvider(cfg.Tracing)
-	return shutdown, err
-}
-
-// provideAgentFactory 提供 AgentFactory
-func provideAgentFactory(modelConfigRepo modeldomainrepo.ModelConfigRepository) *adapter.AgentFactory {
-	return adapter.NewAgentFactory(modelConfigRepo)
-}
-
-// provideRedis 提供redis
-func provideRedis(cfg *config.Config) (redis.Client, error) {
-	cli, err := redis.Initialize(cfg)
-	if err != nil {
-		return nil, err
-	}
-	return cli, nil
-}
+// ServerSet 服务聚合依赖
+var ServerSet = wire.NewSet(
+	http.NewHandlerRegistry,
+	provider.ProvideHTTPServer,
+	provider.ProvideHealthServer,
+)

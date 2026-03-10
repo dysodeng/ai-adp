@@ -3,15 +3,16 @@
 package di
 
 import (
+	"context"
+
 	"github.com/google/wire"
-	"github.com/dysodeng/ai-adp/internal/infrastructure/config"
 )
 
-func InitApp(configPath string) (*App, error) {
+func InitApp(ctx context.Context) (*App, error) {
 	wire.Build(
-		config.Load,
 		InfrastructureSet,
 		ModulesSet,
+		ServerSet,
 		NewApp,
 	)
 	return nil, nil

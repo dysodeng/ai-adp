@@ -22,7 +22,7 @@ type TenantAppService struct {
 	tenantRepo domainrepo.TenantRepository
 }
 
-func NewTenantAppService(tenantRepo domainrepo.TenantRepository) *TenantAppService {
+func NewTenantAppService(tenantRepo domainrepo.TenantRepository) TenantService {
 	return &TenantAppService{tenantRepo: tenantRepo}
 }
 

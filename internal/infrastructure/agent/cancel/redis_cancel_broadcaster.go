@@ -4,7 +4,7 @@ import (
 	"context"
 
 	"github.com/dysodeng/ai-adp/internal/domain/agent/executor"
-	"github.com/dysodeng/ai-adp/internal/infrastructure/logger"
+	"github.com/dysodeng/ai-adp/internal/infrastructure/pkg/logger"
 	pkgredis "github.com/dysodeng/ai-adp/internal/infrastructure/pkg/redis"
 )
 
@@ -16,7 +16,7 @@ type RedisCancelBroadcaster struct {
 }
 
 // NewRedisCancelBroadcaster 创建 Redis 取消广播器
-func NewRedisCancelBroadcaster(client pkgredis.Client) *RedisCancelBroadcaster {
+func NewRedisCancelBroadcaster(client pkgredis.Client) executor.CancelBroadcaster {
 	return &RedisCancelBroadcaster{client: client}
 }
 

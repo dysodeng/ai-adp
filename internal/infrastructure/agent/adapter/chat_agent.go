@@ -12,7 +12,7 @@ import (
 	"github.com/dysodeng/ai-adp/internal/domain/agent/tool"
 	"github.com/dysodeng/ai-adp/internal/domain/app/valueobject"
 	modelconfig "github.com/dysodeng/ai-adp/internal/domain/model/model"
-	"github.com/dysodeng/ai-adp/internal/infrastructure/logger"
+	"github.com/dysodeng/ai-adp/internal/infrastructure/pkg/logger"
 )
 
 // ChatAgent 对话 Agent 适配器

@@ -1,6 +1,10 @@
 package response
 
-import "context"
+import (
+	"context"
+
+	"github.com/dysodeng/ai-adp/internal/infrastructure/pkg/telemetry/trace"
+)
 
 // Response api 响应数据结构
 type Response[T any] struct {
@@ -26,7 +30,7 @@ func Success[T any](ctx context.Context, result T) Response[T] {
 		Code:    CodeOk,
 		Data:    result,
 		Message: "success",
-		TraceId: ParseContextTraceId(ctx),
+		TraceId: trace.ParseContextTraceId(ctx),
 	}
 }
 
@@ -36,6 +40,6 @@ func Fail(ctx context.Context, error string, code Code) Response[any] {
 		Code:    code,
 		Data:    nil,
 		Message: error,
-		TraceId: ParseContextTraceId(ctx),
+		TraceId: trace.ParseContextTraceId(ctx),
 	}
 }

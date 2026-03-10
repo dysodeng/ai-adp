@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/dysodeng/ai-adp/internal/di"
-	"github.com/dysodeng/ai-adp/internal/infrastructure/logger"
+	"github.com/dysodeng/ai-adp/internal/infrastructure/pkg/logger"
 	"github.com/dysodeng/ai-adp/internal/infrastructure/server"
 )
 
@@ -25,70 +25,71 @@ func newApplication(ctx context.Context) *application {
 	return &application{ctx: ctx}
 }
 
-func (a *application) run() {
-	a.initialize()
-	a.serve()
-	a.waitForInterruptSignal()
+func (app *application) run() {
+	app.initialize()
+	app.serve()
+	app.waitForInterruptSignal()
 }
 
-func (a *application) initialize() {
+func (app *application) initialize() {
 	configPath := os.Getenv("CONFIG_PATH")
 	if configPath == "" {
 		configPath = defaultConfigPath
 	}
 
-	mainApp, err := di.InitApp(configPath)
+	mainApp, err := di.InitApp(app.ctx)
 	if err != nil {
 		// logger 此时可能还未初始化，直接输出到 stderr
 		_, _ = fmt.Fprintf(os.Stderr, "应用初始化失败: %v\n", err)
 		os.Exit(1)
 	}
-	a.mainApp = mainApp
+	app.mainApp = mainApp
 }
 
-func (a *application) registerServer(servers ...server.Server) {
+func (app *application) registerServer(servers ...server.Server) {
 	for _, s := range servers {
 		if s.IsEnabled() {
-			a.servers = append(a.servers, s)
+			app.servers = append(app.servers, s)
 		}
 	}
 }
 
-func (a *application) serve() {
-	logger.Info(a.ctx, "starting application servers...")
+func (app *application) serve() {
+	logger.Info(app.ctx, "starting application servers...")
 
-	a.registerServer(
-		a.mainApp.HTTPServer,
+	app.registerServer(
+		app.mainApp.HTTPServer,
+		app.mainApp.HealthServer,
 		// 未来扩展: a.mainApp.GRPCServer, a.mainApp.WSServer
 	)
 
 	// 启动取消信号订阅
-	if err := a.mainApp.StartCancelSubscriber(a.ctx); err != nil {
-		logger.Error(a.ctx, "failed to start cancel subscriber", logger.ErrorField(err))
+	if err := app.mainApp.StartCancelSubscriber(app.ctx); err != nil {
+		logger.Error(app.ctx, "failed to start cancel subscriber", logger.ErrorField(err))
 	}
 
-	for _, s := range a.servers {
+	for _, s := range app.servers {
 		if err := s.Start(); err != nil {
-			logger.Fatal(a.ctx, fmt.Sprintf("%s server failed to start", s.Name()), logger.ErrorField(err))
+			logger.Fatal(app.ctx, fmt.Sprintf("%s server failed to start", s.Name()), logger.ErrorField(err))
 		}
-		logger.Info(a.ctx, fmt.Sprintf("%s server started", s.Name()), logger.AddField("addr", s.Addr()))
+		logger.Info(app.ctx, fmt.Sprintf("%s server started", s.Name()), logger.AddField("addr", s.Addr()))
 	}
 }
 
-func (a *application) waitForInterruptSignal() {
+func (app *application) waitForInterruptSignal() {
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
 	// 取消信号订阅，避免 shutdown 期间再次触发
 	signal.Stop(quit)
 
-	logger.Info(a.ctx, "shutting down servers...")
+	logger.Info(app.ctx, "shutting down servers...")
 
 	// 5 秒关闭预算由所有 Server.Stop 和 mainApp.Stop 共享
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	for _, s := range a.servers {
+	for _, s := range app.servers {
 		if err := s.Stop(ctx); err != nil {
 			logger.Error(ctx, fmt.Sprintf("%s server shutdown error", s.Name()), logger.ErrorField(err))
 		} else {
@@ -96,7 +97,7 @@ func (a *application) waitForInterruptSignal() {
 		}
 	}
 
-	if err := a.mainApp.Stop(ctx); err != nil {
+	if err := app.mainApp.Stop(ctx); err != nil {
 		logger.Error(ctx, "application cleanup error", logger.ErrorField(err))
 	}
 

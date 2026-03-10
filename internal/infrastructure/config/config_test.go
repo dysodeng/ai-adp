@@ -20,23 +20,17 @@ server:
     read_timeout: 15
     write_timeout: 30
     shutdown_timeout: 5
-logger:
-  level: debug
-  format: json
-  output_path: stdout
 security:
   jwt:
     secret: test-secret
 database:
   host: localhost
   port: 5432
-  name: ai_adp_test
-  user: postgres
+  database: ai_adp_test
+  username: postgres
   password: secret
-  ssl_mode: disable
   max_open_conns: 50
   max_idle_conns: 5
-  conn_max_lifetime: 30
 redis:
   main:
     mode: standalone
@@ -91,10 +85,6 @@ func TestLoad_AllSections(t *testing.T) {
 	assert.Equal(t, 15, cfg.Server.HTTP.ReadTimeout)
 	assert.Equal(t, 5, cfg.Server.HTTP.ShutdownTimeout)
 
-	// Logger
-	assert.Equal(t, "debug", cfg.Logger.Level)
-	assert.Equal(t, "json", cfg.Logger.Format)
-
 	// Security
 	assert.Equal(t, "test-secret", cfg.Security.JWT.Secret)
 
@@ -102,7 +92,6 @@ func TestLoad_AllSections(t *testing.T) {
 	assert.Equal(t, "localhost", cfg.Database.Host)
 	assert.Equal(t, 50, cfg.Database.MaxOpenConns)
 	assert.Equal(t, 5, cfg.Database.MaxIdleConns)
-	assert.Equal(t, 30, cfg.Database.ConnMaxLifetime)
 
 	// Redis
 	assert.Equal(t, "standalone", cfg.Redis.Main.Mode)
@@ -124,8 +113,8 @@ app:
 database:
   host: localhost
   port: 5432
-  name: db
-  user: user
+  database: db
+  username: user
 redis:
   main:
     host: 127.0.0.1
@@ -135,8 +124,6 @@ redis:
 	cfg, err := config.Load(path)
 	require.NoError(t, err)
 
-	assert.Equal(t, "info", cfg.Logger.Level)
-	assert.Equal(t, "json", cfg.Logger.Format)
 	assert.Equal(t, 100, cfg.Database.MaxOpenConns)
 	assert.Equal(t, "127.0.0.1", cfg.Redis.Main.Host)
 	assert.False(t, cfg.Tracing.Enabled)

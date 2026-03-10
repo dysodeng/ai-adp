@@ -1,45 +1,69 @@
 package middleware
 
 import (
+	"strconv"
 	"time"
 
 	"github.com/gin-gonic/gin"
-
-	"github.com/dysodeng/ai-adp/internal/infrastructure/logger"
 )
 
-// Logger 记录 HTTP 访问日志，自动从 Gin context 中获取 OTel trace context。
-// 注意：必须在 Tracing() 中间件之后注册，以确保 c.Request.Context() 中已注入 span。
+// Logger 日志中间件
 func Logger() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		start := time.Now()
 		path := c.Request.URL.Path
-		if raw := c.Request.URL.RawQuery; raw != "" {
-			path = path + "?" + raw
-		}
+		method := c.Request.Method
 
 		c.Next()
 
-		latency := time.Since(start)
+		// 记录请求日志
 		statusCode := c.Writer.Status()
-		clientIP := c.ClientIP()
-		method := c.Request.Method
 
-		// 使用 c.Request.Context() 以获取 otelgin 注入的 trace span
-		ctx := c.Request.Context()
-
-		fields := []logger.Field{
-			logger.AddField("status", statusCode),
-			logger.AddField("method", method),
-			logger.AddField("path", path),
-			logger.AddField("ip", clientIP),
-			logger.AddField("latency_ms", latency.Milliseconds()),
+		// 状态码颜色
+		var statusColor string
+		switch {
+		case statusCode >= 200 && statusCode < 300:
+			statusColor = "\033[97;42m" // 绿色
+		case statusCode >= 300 && statusCode < 400:
+			statusColor = "\033[90;47m" // 白色
+		case statusCode >= 400 && statusCode < 500:
+			statusColor = "\033[97;43m" // 黄色
+		default:
+			statusColor = "\033[97;41m" // 红色
 		}
 
-		if len(c.Errors) > 0 {
-			logger.Error(ctx, c.Errors.String(), fields...)
-		} else {
-			logger.Info(ctx, "http_access", fields...)
+		// 方法颜色
+		var methodColor string
+		switch method {
+		case "GET":
+			methodColor = "\033[97;44m" // 蓝色
+		case "POST":
+			methodColor = "\033[97;42m" // 绿色
+		case "PUT":
+			methodColor = "\033[97;43m" // 黄色
+		case "DELETE":
+			methodColor = "\033[97;41m" // 红色
+		case "PATCH":
+			methodColor = "\033[97;45m" // 紫色
+		case "HEAD":
+			methodColor = "\033[97;46m" // 青色
+		default:
+			methodColor = "\033[97;44m" // 蓝色
 		}
+
+		// 重置颜色
+		resetColor := "\033[0m"
+
+		_, _ = gin.DefaultWriter.Write([]byte(
+			"[GIN] " + time.Now().Format("2006/01/02 - 15:04:05") +
+				" | " + methodColor + method + resetColor +
+				" | " + path +
+				" | " + c.ClientIP() +
+				" | " + c.Request.UserAgent() +
+				" | " + time.Since(start).String() +
+				" | " + statusColor + strconv.Itoa(statusCode) + resetColor +
+				" | " + c.Errors.String() +
+				"\n",
+		))
 	}
 }

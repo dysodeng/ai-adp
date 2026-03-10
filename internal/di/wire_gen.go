@@ -7,60 +7,66 @@
 package di
 
 import (
+	"context"
+
 	"github.com/dysodeng/ai-adp/internal/application/chat/orchestrator"
 	service3 "github.com/dysodeng/ai-adp/internal/application/chat/service"
 	"github.com/dysodeng/ai-adp/internal/application/tenant/service"
+	"github.com/dysodeng/ai-adp/internal/di/provider"
 	service2 "github.com/dysodeng/ai-adp/internal/domain/agent/service"
 	"github.com/dysodeng/ai-adp/internal/domain/shared/port"
 	"github.com/dysodeng/ai-adp/internal/infrastructure/agent/cancel"
-	"github.com/dysodeng/ai-adp/internal/infrastructure/config"
 	"github.com/dysodeng/ai-adp/internal/infrastructure/persistence/repository/app"
 	"github.com/dysodeng/ai-adp/internal/infrastructure/persistence/repository/model"
 	"github.com/dysodeng/ai-adp/internal/infrastructure/persistence/repository/tenant"
-	"github.com/dysodeng/ai-adp/internal/infrastructure/server"
 	"github.com/dysodeng/ai-adp/internal/interfaces/http"
 	"github.com/dysodeng/ai-adp/internal/interfaces/http/handler"
 )
 
 // Injectors from wire.go:
 
-func InitApp(configPath string) (*App, error) {
-	configConfig, err := config.Load(configPath)
+func InitApp(ctx context.Context) (*App, error) {
+	config, err := provider.ProvideConfig()
 	if err != nil {
 		return nil, err
 	}
-	db, err := provideDB(configConfig)
+	monitor, err := provider.ProvideMonitor(config)
 	if err != nil {
 		return nil, err
 	}
-	tenantRepositoryImpl := tenant.NewTenantRepository(db)
-	tenantAppService := service.NewTenantAppService(tenantRepositoryImpl)
-	tenantHandler := handler.NewTenantHandler(tenantAppService)
+	logger, err := provider.ProvideLogger(config)
+	if err != nil {
+		return nil, err
+	}
+	transactionManager, err := provider.ProvideDB(ctx, config)
+	if err != nil {
+		return nil, err
+	}
+	client, err := provider.ProvideRedis(config)
+	if err != nil {
+		return nil, err
+	}
+	cache, err := provider.ProvideCache(config)
+	if err != nil {
+		return nil, err
+	}
+	tenantRepository := tenant.NewTenantRepository(transactionManager)
+	tenantService := service.NewTenantAppService(tenantRepository)
+	tenantHandler := handler.NewTenantHandler(tenantService)
 	toolService := port.NewMockToolService()
 	agentBuilder := service2.NewAgentBuilder(toolService)
-	modelConfigRepositoryImpl := model.NewModelConfigRepository(db)
-	agentFactory := provideAgentFactory(modelConfigRepositoryImpl)
-	memoryTaskRegistry := cancel.NewMemoryTaskRegistry()
-	executorOrchestrator := orchestrator.NewExecutorOrchestrator(agentBuilder, agentFactory, memoryTaskRegistry)
-	appRepositoryImpl := app.NewAppRepository(db)
-	chatAppService := service3.NewChatAppService(executorOrchestrator, appRepositoryImpl)
+	modelConfigRepository := model.NewModelConfigRepository(transactionManager)
+	agentFactory := provider.ProvideAgentFactory(modelConfigRepository)
+	taskRegistry := cancel.NewMemoryTaskRegistry()
+	executorOrchestrator := orchestrator.NewExecutorOrchestrator(agentBuilder, agentFactory, taskRegistry)
+	appRepository := app.NewAppRepository(transactionManager)
+	chatAppService := service3.NewChatAppService(executorOrchestrator, appRepository)
 	chatHandler := handler.NewChatHandler(chatAppService)
-	client, err := provideRedis(configConfig)
-	if err != nil {
-		return nil, err
-	}
-	redisCancelBroadcaster := cancel.NewRedisCancelBroadcaster(client)
-	cancelHandler := handler.NewCancelHandler(memoryTaskRegistry, redisCancelBroadcaster)
-	router := http.NewRouter(tenantHandler, chatHandler, cancelHandler)
-	httpServer := server.NewHTTPServer(configConfig, router)
-	logger, err := provideLogger(configConfig)
-	if err != nil {
-		return nil, err
-	}
-	shutdownFunc, err := provideTracerShutdown(configConfig)
-	if err != nil {
-		return nil, err
-	}
-	diApp := NewApp(httpServer, appRepositoryImpl, logger, shutdownFunc, toolService, agentBuilder, agentFactory, redisCancelBroadcaster, memoryTaskRegistry)
+	cancelBroadcaster := cancel.NewRedisCancelBroadcaster(client)
+	cancelHandler := handler.NewCancelHandler(taskRegistry, cancelBroadcaster)
+	handlerRegistry := http.NewHandlerRegistry(tenantHandler, chatHandler, cancelHandler)
+	server := provider.ProvideHTTPServer(config, handlerRegistry)
+	healthServer := provider.ProvideHealthServer(config)
+	diApp := NewApp(config, monitor, logger, transactionManager, client, cache, handlerRegistry, server, healthServer, toolService, agentBuilder, agentFactory, cancelBroadcaster, taskRegistry)
 	return diApp, nil
 }
