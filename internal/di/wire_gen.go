@@ -67,6 +67,10 @@ func InitApp(ctx context.Context) (*App, error) {
 	handlerRegistry := http.NewHandlerRegistry(tenantHandler, chatHandler, cancelHandler)
 	server := provider.ProvideHTTPServer(config, handlerRegistry)
 	healthServer := provider.ProvideHealthServer(config)
-	diApp := NewApp(config, monitor, logger, transactionManager, client, cache, handlerRegistry, server, healthServer, toolService, agentBuilder, agentFactory, cancelBroadcaster, taskRegistry)
+	gatewayRegistry, err := provider.ProvideGatewayRegistry(config)
+	if err != nil {
+		return nil, err
+	}
+	diApp := NewApp(config, monitor, logger, transactionManager, client, cache, handlerRegistry, server, healthServer, toolService, agentBuilder, agentFactory, cancelBroadcaster, taskRegistry, gatewayRegistry)
 	return diApp, nil
 }

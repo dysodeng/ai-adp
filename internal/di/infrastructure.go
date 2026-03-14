@@ -24,6 +24,8 @@ var InfrastructureSet = wire.NewSet(
 	// 取消能力组件
 	cancel.NewMemoryTaskRegistry,
 	cancel.NewRedisCancelBroadcaster,
+	// 网关注册
+	provider.ProvideGatewayRegistry,
 )
 
 // ServerSet 服务聚合依赖

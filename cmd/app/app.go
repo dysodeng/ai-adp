@@ -74,6 +74,11 @@ func (app *application) serve() {
 		}
 		logger.Info(app.ctx, fmt.Sprintf("%s server started", s.Name()), logger.AddField("addr", s.Addr()))
 	}
+
+	// 注册服务到网关
+	if err := app.mainApp.RegisterGateway(app.ctx); err != nil {
+		logger.Error(app.ctx, "failed to register service to gateway", logger.ErrorField(err))
+	}
 }
 
 func (app *application) waitForInterruptSignal() {

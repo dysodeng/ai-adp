@@ -23,6 +23,7 @@ type Config struct {
 	Cache    Cache          `mapstructure:"cache"`
 	Monitor  Monitor        `mapstructure:"monitor"`
 	Tracing  TracingConfig  `mapstructure:"tracing"`
+	Gateway  Gateway        `mapstructure:"gateway"`
 }
 
 // TracingConfig OpenTelemetry 分布式追踪配置
@@ -103,6 +104,14 @@ func Load(path string) (*Config, error) {
 		}
 	}
 
+	var gatewayConfig Gateway
+	if gateway := v.Sub("gateway"); gateway != nil {
+		gatewayBindEnv(gateway)
+		if err := gateway.Unmarshal(&gatewayConfig); err != nil {
+			return nil, err
+		}
+	}
+
 	// 设置默认值
 	setDefaults(v)
 
@@ -121,6 +130,7 @@ func Load(path string) (*Config, error) {
 	cfg.Redis = redisConfig
 	cfg.Monitor = monitorConfig
 	cfg.Cache = cacheConfig
+	cfg.Gateway = gatewayConfig
 
 	GlobalConfig = &cfg
 
