@@ -12,6 +12,13 @@ import (
 func AppApiKey(ctx *gin.Context) {
 	apiKey := ctx.GetHeader("Authorization")
 	if apiKey == "" {
+		// 回退到查询参数（支持 EventSource GET 请求）
+		apiKey = ctx.Query("api_key")
+		if apiKey != "" {
+			ctx.Set("api_key", apiKey)
+			ctx.Next()
+			return
+		}
 		ctx.AbortWithStatusJSON(http.StatusOK, response.Fail(ctx, "Missing Authorization header", response.CodeUnauthorized))
 		return
 	}

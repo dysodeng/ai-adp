@@ -32,6 +32,7 @@ func registerV1Routes(v1 *gin.RouterGroup, registry *http.HandlerRegistry) {
 	chats := v1.Group("/chat", middleware.AppApiKey)
 	{
 		chats.POST("/send-messages", registry.ChatHandler.Chat)
+		chats.GET("/tasks/:task_id/stream", registry.ChatHandler.StreamReconnect)
 		chats.POST("/tasks/:task_id/cancel", registry.ChatCancelHandler.Cancel)
 	}
 }
