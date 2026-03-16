@@ -11,7 +11,7 @@ type MemoryExecutorRegistry struct {
 	executors sync.Map
 }
 
-func NewMemoryExecutorRegistry() *MemoryExecutorRegistry {
+func NewMemoryExecutorRegistry() executor.ExecutorRegistry {
 	return &MemoryExecutorRegistry{}
 }
 

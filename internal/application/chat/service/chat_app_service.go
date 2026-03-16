@@ -109,7 +109,7 @@ func (svc *chatAppService) Chat(
 	)
 
 	// 6. 通过编排器执行
-	if err := svc.orchestrator.Execute(ctx, app, version, agentExecutor, isStream); err != nil {
+	if err = svc.orchestrator.Execute(ctx, app, version, agentExecutor, isStream); err != nil {
 		return nil, err
 	}
 

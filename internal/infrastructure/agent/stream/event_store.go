@@ -23,7 +23,7 @@ type RedisEventStore struct {
 	keyPrefix string
 }
 
-func NewRedisEventStore(client redis.UniversalClient, keyPrefix string) *RedisEventStore {
+func NewRedisEventStore(client redis.UniversalClient, keyPrefix string) executor.EventStore {
 	return &RedisEventStore{client: client, keyPrefix: keyPrefix}
 }
 

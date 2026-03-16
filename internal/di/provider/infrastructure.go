@@ -3,6 +3,8 @@ package provider
 import (
 	"context"
 
+	"github.com/dysodeng/ai-adp/internal/domain/agent/executor"
+	"github.com/dysodeng/ai-adp/internal/infrastructure/agent/stream"
 	"github.com/dysodeng/ai-adp/internal/infrastructure/pkg/telemetry"
 	"go.uber.org/zap"
 
@@ -72,4 +74,9 @@ func ProvideDB(ctx context.Context, cfg *config.Config) (transactions.Transactio
 // ProvideAgentFactory 提供 AgentFactory
 func ProvideAgentFactory(modelConfigRepo modeldomainrepo.ModelConfigRepository) *adapter.AgentFactory {
 	return adapter.NewAgentFactory(modelConfigRepo)
+}
+
+func ProvideRedisEventStore(client redis.Client) executor.EventStore {
+	prefix := redis.MainKey("")
+	return stream.NewRedisEventStore(client, prefix)
 }
