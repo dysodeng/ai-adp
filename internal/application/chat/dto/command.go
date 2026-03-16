@@ -15,8 +15,15 @@ func (m ResponseMode) IsValid() bool {
 
 // ChatCommand Chat 对话命令
 type ChatCommand struct {
-	ConversationID string         `json:"conversation_id"`
-	Query          string         `json:"query"`
-	Input          map[string]any `json:"input"`
-	ResponseMode   ResponseMode   `json:"response_mode"`
+	ConversationID  string         `json:"conversation_id"`
+	Query           string         `json:"query"`
+	Input           map[string]any `json:"input"`
+	ResponseMode    ResponseMode   `json:"response_mode"`
+	EnableSSEResume bool           `json:"enable_sse_resume"`
+}
+
+// ReconnectCommand SSE 重连命令
+type ReconnectCommand struct {
+	TaskID      string `json:"task_id"`
+	LastEventID string `json:"last_event_id"`
 }
