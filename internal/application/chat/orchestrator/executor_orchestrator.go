@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	domainagent "github.com/dysodeng/ai-adp/internal/domain/agent/agent"
 	"github.com/dysodeng/ai-adp/internal/domain/agent/executor"
@@ -20,9 +21,10 @@ type ExecutorOrchestrator interface {
 }
 
 type executorOrchestrator struct {
-	agentBuilder service.AgentBuilder
-	agentFactory *adapter.AgentFactory
-	taskRegistry executor.TaskRegistry
+	agentBuilder     service.AgentBuilder
+	agentFactory     *adapter.AgentFactory
+	taskRegistry     executor.TaskRegistry
+	executorRegistry executor.ExecutorRegistry
 }
 
 // NewExecutorOrchestrator 创建执行编排器
@@ -30,11 +32,13 @@ func NewExecutorOrchestrator(
 	agentBuilder service.AgentBuilder,
 	agentFactory *adapter.AgentFactory,
 	taskRegistry executor.TaskRegistry,
+	executorRegistry executor.ExecutorRegistry,
 ) ExecutorOrchestrator {
 	return &executorOrchestrator{
-		agentBuilder: agentBuilder,
-		agentFactory: agentFactory,
-		taskRegistry: taskRegistry,
+		agentBuilder:     agentBuilder,
+		agentFactory:     agentFactory,
+		taskRegistry:     taskRegistry,
+		executorRegistry: executorRegistry,
 	}
 }
 
@@ -73,11 +77,23 @@ func (o *executorOrchestrator) Execute(
 
 	// 4. 启动执行
 	agentExecutor.Start()
+
+	// 注册到 ExecutorRegistry（用于 SSE 重连查找）
+	if o.executorRegistry != nil {
+		o.executorRegistry.Register(taskID, agentExecutor)
+	}
+
 	logger.Info(ctx, "[orchestrator] agentExecutor.Start() done, launching goroutine")
 
 	// 5. 异步执行 Agent
 	go func() {
 		defer o.taskRegistry.Unregister(taskID)
+		defer func() {
+			if o.executorRegistry != nil {
+				// 延迟 30s 注销，给重连留出时间窗口
+				o.executorRegistry.DelayedUnregister(taskID, 30*time.Second)
+			}
+		}()
 		o.executeAgent(execCtx, ag, agentExecutor)
 	}()
 
