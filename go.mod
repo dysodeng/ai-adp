@@ -3,7 +3,7 @@ module github.com/dysodeng/ai-adp
 go 1.25.0
 
 require (
-	github.com/cloudwego/eino v0.7.37
+	github.com/cloudwego/eino v0.8.2
 	github.com/cloudwego/eino-ext/components/embedding/ark v0.1.1
 	github.com/cloudwego/eino-ext/components/embedding/ollama v0.0.0-20260302070227-13ce9b3fa975
 	github.com/cloudwego/eino-ext/components/embedding/openai v0.0.0-20260302070227-13ce9b3fa975
