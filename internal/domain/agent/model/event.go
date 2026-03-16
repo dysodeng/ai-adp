@@ -31,6 +31,9 @@ const (
 
 	// Token统计事件
 	EventTypeTokenUsage EventType = "token.usage"
+
+	// 流过期事件
+	EventTypeExpired EventType = "expired"
 )
 
 // Event 领域事件
@@ -39,6 +42,7 @@ type Event struct {
 	TaskID    string      `json:"task_id"`
 	Timestamp time.Time   `json:"timestamp"`
 	Data      interface{} `json:"data,omitempty"`
+	StreamID  string      `json:"-"` // SSE id 字段，不序列化到 JSON
 }
 
 // ExecutionInput 执行输入
