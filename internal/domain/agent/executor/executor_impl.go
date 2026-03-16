@@ -11,6 +11,16 @@ import (
 	"github.com/dysodeng/ai-adp/internal/domain/app/valueobject"
 )
 
+// Option 配置 AgentExecutor 的选项函数
+type Option func(*agentExecutorImpl)
+
+// WithEventStore 设置事件存储
+func WithEventStore(store EventStore) Option {
+	return func(e *agentExecutorImpl) {
+		e.eventStore = store
+	}
+}
+
 // agentExecutorImpl AgentExecutor 的默认实现
 type agentExecutorImpl struct {
 	ctx            context.Context
@@ -29,6 +39,8 @@ type agentExecutorImpl struct {
 
 	subscribers []chan *model.Event
 	mu          sync.RWMutex
+
+	eventStore EventStore
 }
 
 // NewAgentExecutor 创建新的 AgentExecutor
@@ -40,8 +52,9 @@ func NewAgentExecutor(
 	conversationID uuid.UUID,
 	messageID uuid.UUID,
 	input model.ExecutionInput,
+	opts ...Option,
 ) AgentExecutor {
-	return &agentExecutorImpl{
+	e := &agentExecutorImpl{
 		ctx:            ctx,
 		taskID:         taskID,
 		appID:          appID,
@@ -52,6 +65,10 @@ func NewAgentExecutor(
 		status:         model.ExecutionStatusPending,
 		subscribers:    make([]chan *model.Event, 0),
 	}
+	for _, opt := range opts {
+		opt(e)
+	}
+	return e
 }
 
 func (e *agentExecutorImpl) Ctx() context.Context            { return e.ctx }
@@ -95,6 +112,9 @@ func (e *agentExecutorImpl) Complete(output *model.ExecutionOutput) {
 		Data:      output,
 	})
 	e.closeAllSubscribers()
+	if e.eventStore != nil {
+		_ = e.eventStore.SetTTL(e.ctx, e.taskID.String(), 30*time.Second)
+	}
 }
 
 func (e *agentExecutorImpl) Fail(err error) {
@@ -112,6 +132,9 @@ func (e *agentExecutorImpl) Fail(err error) {
 		Data:      err,
 	})
 	e.closeAllSubscribers()
+	if e.eventStore != nil {
+		_ = e.eventStore.SetTTL(e.ctx, e.taskID.String(), 30*time.Second)
+	}
 }
 
 func (e *agentExecutorImpl) Cancel() {
@@ -131,6 +154,9 @@ func (e *agentExecutorImpl) Cancel() {
 		},
 	})
 	e.closeAllSubscribers()
+	if e.eventStore != nil {
+		_ = e.eventStore.SetTTL(e.ctx, e.taskID.String(), 30*time.Second)
+	}
 }
 
 func (e *agentExecutorImpl) Err() error {
@@ -305,6 +331,18 @@ func (e *agentExecutorImpl) GetOutput() *model.ExecutionOutput {
 // broadcastEvent 发布事件到所有订阅者（调用方必须已持有锁）
 func (e *agentExecutorImpl) broadcastEvent(event *model.Event) {
 	event.TaskID = e.taskID.String()
+
+	// 写入事件存储（如果启用）
+	// Note: Redis I/O under mutex is acceptable for AI streaming rates (~1ms vs ~50-100ms token interval)
+	if e.eventStore != nil {
+		streamID, err := e.eventStore.Append(e.ctx, e.taskID.String(), event)
+		if err != nil {
+			// Write failure doesn't affect normal push, degrades to non-resumable
+		} else {
+			event.StreamID = streamID
+		}
+	}
+
 	for _, ch := range e.subscribers {
 		select {
 		case ch <- event:
