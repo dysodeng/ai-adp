@@ -16,6 +16,7 @@ import (
 	service2 "github.com/dysodeng/ai-adp/internal/domain/agent/service"
 	"github.com/dysodeng/ai-adp/internal/domain/shared/port"
 	"github.com/dysodeng/ai-adp/internal/infrastructure/agent/cancel"
+	"github.com/dysodeng/ai-adp/internal/infrastructure/agent/stream"
 	"github.com/dysodeng/ai-adp/internal/infrastructure/persistence/repository/app"
 	"github.com/dysodeng/ai-adp/internal/infrastructure/persistence/repository/model"
 	"github.com/dysodeng/ai-adp/internal/infrastructure/persistence/repository/tenant"
@@ -58,9 +59,11 @@ func InitApp(ctx context.Context) (*App, error) {
 	modelConfigRepository := model.NewModelConfigRepository(transactionManager)
 	agentFactory := provider.ProvideAgentFactory(modelConfigRepository)
 	taskRegistry := cancel.NewMemoryTaskRegistry()
-	executorOrchestrator := orchestrator.NewExecutorOrchestrator(agentBuilder, agentFactory, taskRegistry)
+	memoryExecutorRegistry := stream.NewMemoryExecutorRegistry()
+	executorOrchestrator := orchestrator.NewExecutorOrchestrator(agentBuilder, agentFactory, taskRegistry, memoryExecutorRegistry)
 	appRepository := app.NewAppRepository(transactionManager)
-	chatAppService := service3.NewChatAppService(executorOrchestrator, appRepository)
+	redisEventStore := provideRedisEventStore(client)
+	chatAppService := service3.NewChatAppService(executorOrchestrator, appRepository, redisEventStore, memoryExecutorRegistry)
 	chatHandler := handler.NewChatHandler(chatAppService)
 	cancelBroadcaster := cancel.NewRedisCancelBroadcaster(client)
 	cancelHandler := handler.NewCancelHandler(taskRegistry, cancelBroadcaster)
