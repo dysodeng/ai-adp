@@ -48,4 +48,5 @@ type AgentExecutor interface {
 	IsCompleted() bool
 	Duration() time.Duration
 	GetOutput() *model.ExecutionOutput
+	HasEventStore() bool
 }

@@ -37,7 +37,7 @@ var InfrastructureSet = wire.NewSet(
 )
 
 func provideRedisEventStore(client pkgredis.Client) *stream.RedisEventStore {
-	prefix := pkgredis.MainKey("sse:events")
+	prefix := pkgredis.MainKey("")
 	return stream.NewRedisEventStore(client, prefix)
 }
 

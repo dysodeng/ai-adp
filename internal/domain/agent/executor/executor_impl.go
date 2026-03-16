@@ -313,6 +313,10 @@ func (e *agentExecutorImpl) IsCompleted() bool {
 	return e.GetStatus() == model.ExecutionStatusCompleted
 }
 
+func (e *agentExecutorImpl) HasEventStore() bool {
+	return e.eventStore != nil
+}
+
 func (e *agentExecutorImpl) Duration() time.Duration {
 	e.mu.RLock()
 	defer e.mu.RUnlock()

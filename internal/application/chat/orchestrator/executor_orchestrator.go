@@ -71,8 +71,15 @@ func (o *executorOrchestrator) Execute(
 	logger.Info(ctx, "[orchestrator] CreateAgent done")
 
 	// 3. 创建可取消的 context 并注册到 TaskRegistry
+	// 开启 SSE resume 时，使用独立 context，避免客户端断开导致 AI 生成中断
 	taskID := agentExecutor.GetTaskID().String()
-	execCtx, cancel := context.WithCancel(ctx)
+	var baseCtx context.Context
+	if agentExecutor.HasEventStore() {
+		baseCtx = context.Background()
+	} else {
+		baseCtx = ctx
+	}
+	execCtx, cancel := context.WithCancel(baseCtx)
 	o.taskRegistry.Register(taskID, cancel)
 
 	// 4. 启动执行
