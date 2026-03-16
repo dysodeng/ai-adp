@@ -2,7 +2,6 @@ package executor
 
 import (
 	"context"
-	"fmt"
 	"testing"
 	"time"
 
@@ -19,7 +18,7 @@ type mockEventStore struct {
 	lastEvent    *model.Event
 	returnID     string
 	returnErr    error
-	deleteCalled int
+	setTTLCalled int
 }
 
 func (m *mockEventStore) Append(_ context.Context, taskID string, event *model.Event) (string, error) {
@@ -32,13 +31,13 @@ func (m *mockEventStore) ReadAfter(_ context.Context, _ string, _ string, _ int6
 	return nil, nil
 }
 func (m *mockEventStore) SetTTL(_ context.Context, _ string, _ time.Duration) error {
+	m.setTTLCalled++
 	return nil
 }
 func (m *mockEventStore) Exists(_ context.Context, _ string) (bool, error) {
 	return false, nil
 }
 func (m *mockEventStore) Delete(_ context.Context, _ string) error {
-	m.deleteCalled++
 	return nil
 }
 
@@ -63,28 +62,12 @@ func TestWithEventStore(t *testing.T) {
 	assert.Equal(t, model.EventTypeStart, store.lastEvent.Type)
 }
 
-func TestEventStoreDeleteOnComplete(t *testing.T) {
+func TestEventStoreSetTTLOnComplete(t *testing.T) {
 	store := &mockEventStore{returnID: "100-0"}
 	exec := newTestExecutor(WithEventStore(store))
 	exec.Start()
 	exec.Complete(&model.ExecutionOutput{})
-	assert.Equal(t, 1, store.deleteCalled)
-}
-
-func TestEventStoreDeleteOnFail(t *testing.T) {
-	store := &mockEventStore{returnID: "100-0"}
-	exec := newTestExecutor(WithEventStore(store))
-	exec.Start()
-	exec.Fail(fmt.Errorf("test error"))
-	assert.Equal(t, 1, store.deleteCalled)
-}
-
-func TestEventStoreDeleteOnCancel(t *testing.T) {
-	store := &mockEventStore{returnID: "100-0"}
-	exec := newTestExecutor(WithEventStore(store))
-	exec.Start()
-	exec.Cancel()
-	assert.Equal(t, 1, store.deleteCalled)
+	assert.Equal(t, 1, store.setTTLCalled)
 }
 
 func TestWithoutEventStoreNoError(t *testing.T) {

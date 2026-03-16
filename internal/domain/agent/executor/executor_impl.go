@@ -114,7 +114,7 @@ func (e *agentExecutorImpl) Complete(output *model.ExecutionOutput) {
 	})
 	e.closeAllSubscribers()
 	if e.eventStore != nil {
-		_ = e.eventStore.Delete(e.storeCtx(), e.taskID.String())
+		_ = e.eventStore.SetTTL(e.storeCtx(), e.taskID.String(), 2*time.Minute)
 	}
 }
 
@@ -134,7 +134,7 @@ func (e *agentExecutorImpl) Fail(err error) {
 	})
 	e.closeAllSubscribers()
 	if e.eventStore != nil {
-		_ = e.eventStore.Delete(e.storeCtx(), e.taskID.String())
+		_ = e.eventStore.SetTTL(e.storeCtx(), e.taskID.String(), 2*time.Minute)
 	}
 }
 
@@ -156,7 +156,7 @@ func (e *agentExecutorImpl) Cancel() {
 	})
 	e.closeAllSubscribers()
 	if e.eventStore != nil {
-		_ = e.eventStore.Delete(e.storeCtx(), e.taskID.String())
+		_ = e.eventStore.SetTTL(e.storeCtx(), e.taskID.String(), 2*time.Minute)
 	}
 }
 
