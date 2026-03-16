@@ -17,4 +17,6 @@ type EventStore interface {
 	SetTTL(ctx context.Context, taskID string, ttl time.Duration) error
 	// Exists 检查指定任务的事件流是否存在
 	Exists(ctx context.Context, taskID string) (bool, error)
+	// Delete 删除指定任务的事件流
+	Delete(ctx context.Context, taskID string) error
 }

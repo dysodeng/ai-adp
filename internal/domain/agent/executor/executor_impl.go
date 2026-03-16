@@ -41,6 +41,7 @@ type agentExecutorImpl struct {
 	mu          sync.RWMutex
 
 	eventStore EventStore
+	execCtx    context.Context // 独立于请求上下文，用于事件存储操作
 }
 
 // NewAgentExecutor 创建新的 AgentExecutor
@@ -113,7 +114,7 @@ func (e *agentExecutorImpl) Complete(output *model.ExecutionOutput) {
 	})
 	e.closeAllSubscribers()
 	if e.eventStore != nil {
-		_ = e.eventStore.SetTTL(e.ctx, e.taskID.String(), 30*time.Second)
+		_ = e.eventStore.Delete(e.storeCtx(), e.taskID.String())
 	}
 }
 
@@ -133,7 +134,7 @@ func (e *agentExecutorImpl) Fail(err error) {
 	})
 	e.closeAllSubscribers()
 	if e.eventStore != nil {
-		_ = e.eventStore.SetTTL(e.ctx, e.taskID.String(), 30*time.Second)
+		_ = e.eventStore.Delete(e.storeCtx(), e.taskID.String())
 	}
 }
 
@@ -155,7 +156,7 @@ func (e *agentExecutorImpl) Cancel() {
 	})
 	e.closeAllSubscribers()
 	if e.eventStore != nil {
-		_ = e.eventStore.SetTTL(e.ctx, e.taskID.String(), 30*time.Second)
+		_ = e.eventStore.Delete(e.storeCtx(), e.taskID.String())
 	}
 }
 
@@ -317,6 +318,20 @@ func (e *agentExecutorImpl) HasEventStore() bool {
 	return e.eventStore != nil
 }
 
+func (e *agentExecutorImpl) SetExecContext(ctx context.Context) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	e.execCtx = ctx
+}
+
+// storeCtx 返回事件存储使用的 context，优先使用 execCtx
+func (e *agentExecutorImpl) storeCtx() context.Context {
+	if e.execCtx != nil {
+		return e.execCtx
+	}
+	return e.ctx
+}
+
 func (e *agentExecutorImpl) Duration() time.Duration {
 	e.mu.RLock()
 	defer e.mu.RUnlock()
@@ -339,7 +354,7 @@ func (e *agentExecutorImpl) broadcastEvent(event *model.Event) {
 	// 写入事件存储（如果启用）
 	// Note: Redis I/O under mutex is acceptable for AI streaming rates (~1ms vs ~50-100ms token interval)
 	if e.eventStore != nil {
-		streamID, err := e.eventStore.Append(e.ctx, e.taskID.String(), event)
+		streamID, err := e.eventStore.Append(e.storeCtx(), e.taskID.String(), event)
 		if err != nil {
 			// Write failure doesn't affect normal push, degrades to non-resumable
 		} else {

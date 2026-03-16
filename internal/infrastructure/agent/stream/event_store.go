@@ -64,7 +64,7 @@ func (s *RedisEventStore) ReadAfter(ctx context.Context, taskID string, lastID s
 			continue
 		}
 		var event model.Event
-		if err := sonic.UnmarshalString(dataStr, &event); err != nil {
+		if err = sonic.UnmarshalString(dataStr, &event); err != nil {
 			continue
 		}
 		event.StreamID = msg.ID
@@ -85,4 +85,6 @@ func (s *RedisEventStore) Exists(ctx context.Context, taskID string) (bool, erro
 	return n > 0, nil
 }
 
-var _ executor.EventStore = (*RedisEventStore)(nil)
+func (s *RedisEventStore) Delete(ctx context.Context, taskID string) error {
+	return s.client.Del(ctx, s.streamKey(taskID)).Err()
+}

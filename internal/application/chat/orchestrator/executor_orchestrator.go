@@ -81,6 +81,7 @@ func (o *executorOrchestrator) Execute(
 	}
 	execCtx, cancel := context.WithCancel(baseCtx)
 	o.taskRegistry.Register(taskID, cancel)
+	agentExecutor.SetExecContext(execCtx)
 
 	// 4. 启动执行
 	agentExecutor.Start()

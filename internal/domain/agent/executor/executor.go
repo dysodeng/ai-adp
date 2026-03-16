@@ -49,4 +49,8 @@ type AgentExecutor interface {
 	Duration() time.Duration
 	GetOutput() *model.ExecutionOutput
 	HasEventStore() bool
+
+	// ========== 上下文管理 ==========
+	// SetExecContext 设置执行上下文，用于事件存储等内部操作，独立于请求上下文
+	SetExecContext(ctx context.Context)
 }

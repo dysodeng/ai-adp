@@ -46,16 +46,18 @@ func TestReconnection_FullFlow(t *testing.T) {
 	// Client "disconnects" after receiving 3rd event (index 2, the last one before disconnect)
 	lastReceivedID := events[2].StreamID
 
-	// More events arrive while client is disconnected
+	// More events arrive while client is disconnected (task still running)
 	exec.PublishChunk("!")
+
+	// Client reconnects before task completes — read events after lastReceivedID
+	cachedEvents, err := eventStore.ReadAfter(context.Background(), taskID.String(), lastReceivedID, 10000)
+	require.NoError(t, err)
+	assert.Len(t, cachedEvents, 1) // "!" chunk
+
+	// Task completes (this deletes the Redis stream)
 	exec.Complete(&model.ExecutionOutput{
 		Message: &model.Message{Role: "assistant", Content: model.MessageContent{Content: "hello world!"}},
 	})
-
-	// Client reconnects — read events after lastReceivedID
-	cachedEvents, err := eventStore.ReadAfter(context.Background(), taskID.String(), lastReceivedID, 10000)
-	require.NoError(t, err)
-	assert.Len(t, cachedEvents, 2) // "!" chunk + complete
 
 	// Replay via SSE
 	w := httptest.NewRecorder()
@@ -67,7 +69,6 @@ func TestReconnection_FullFlow(t *testing.T) {
 
 	body := w.Body.String()
 	assert.True(t, strings.Contains(body, "event: chunk"))
-	assert.True(t, strings.Contains(body, "event: complete"))
 }
 
 func TestReconnection_ExpiredStream(t *testing.T) {
