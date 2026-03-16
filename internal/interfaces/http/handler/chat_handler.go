@@ -52,7 +52,7 @@ func (h *ChatHandler) Chat(ctx *gin.Context) {
 	if responseMode == chatdto.ResponseModeBlocking {
 		adapter = protocol.NewBlockingAdapter(ctx.Writer)
 	} else {
-		sseAdapter, err := protocol.NewSSEAdapter(ctx.Writer)
+		sseAdapter, err := protocol.NewSSEAdapter(ctx.Writer, false)
 		if err != nil {
 			ctx.JSON(http.StatusOK, response.Fail(spanCtx, "streaming not supported", response.CodeInternalServerError))
 			return

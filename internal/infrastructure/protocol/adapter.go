@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/dysodeng/ai-adp/internal/domain/agent/executor"
+	"github.com/dysodeng/ai-adp/internal/domain/agent/model"
 )
 
 // Adapter 协议适配器接口
@@ -14,4 +15,10 @@ type Adapter interface {
 	Close() error
 	// SendError 发送错误事件
 	SendError(err error) error
+}
+
+// ReconnectableAdapter 支持重连的协议适配器接口
+type ReconnectableAdapter interface {
+	Adapter
+	HandleReconnection(ctx context.Context, cachedEvents []*model.Event, liveExecutor executor.AgentExecutor) error
 }

@@ -15,13 +15,15 @@ import (
 // SSEAdapter SSE 协议适配器
 // 职责：订阅 AgentExecutor 的事件流，转换为 SSE 格式输出
 type SSEAdapter struct {
-	w       http.ResponseWriter
-	flusher http.Flusher
-	closed  bool
+	w            http.ResponseWriter
+	flusher      http.Flusher
+	closed       bool
+	enableResume bool
+	retrySent    bool
 }
 
 // NewSSEAdapter 创建 SSE 适配器
-func NewSSEAdapter(w http.ResponseWriter) (*SSEAdapter, error) {
+func NewSSEAdapter(w http.ResponseWriter, enableResume bool) (*SSEAdapter, error) {
 	flusher, ok := w.(http.Flusher)
 	if !ok {
 		return nil, fmt.Errorf("streaming not supported")
@@ -32,7 +34,7 @@ func NewSSEAdapter(w http.ResponseWriter) (*SSEAdapter, error) {
 	w.Header().Set("Connection", "keep-alive")
 	w.Header().Set("X-Accel-Buffering", "no")
 
-	return &SSEAdapter{w: w, flusher: flusher}, nil
+	return &SSEAdapter{w: w, flusher: flusher, enableResume: enableResume}, nil
 }
 
 // HandleExecution 订阅事件流并转换为 SSE 格式发送
@@ -46,14 +48,55 @@ func (a *SSEAdapter) HandleExecution(ctx context.Context, agentExecutor executor
 			if !ok {
 				return nil
 			}
-			if err := a.sendEvent(event); err != nil {
+			if err := a.SendEvent(event); err != nil {
 				return err
 			}
 		}
 	}
 }
 
-func (a *SSEAdapter) sendEvent(event *model.Event) error {
+// HandleReconnection replays cached events then continues with live executor
+func (a *SSEAdapter) HandleReconnection(ctx context.Context, cachedEvents []*model.Event, liveExecutor executor.AgentExecutor) error {
+	var lastSentID string
+	for _, event := range cachedEvents {
+		if err := a.SendEvent(event); err != nil {
+			return err
+		}
+		if event.StreamID != "" {
+			lastSentID = event.StreamID
+		}
+	}
+
+	if liveExecutor == nil {
+		return nil
+	}
+
+	eventChan := liveExecutor.Subscribe()
+	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case event, ok := <-eventChan:
+			if !ok {
+				return nil
+			}
+			// Skip synthetic events (no StreamID) from Subscribe()
+			if event.StreamID == "" {
+				continue
+			}
+			// Dedup: skip events already sent via cache replay
+			if lastSentID != "" && event.StreamID <= lastSentID {
+				continue
+			}
+			if err := a.SendEvent(event); err != nil {
+				return err
+			}
+		}
+	}
+}
+
+// SendEvent sends a single event in SSE format (exported for use by handler)
+func (a *SSEAdapter) SendEvent(event *model.Event) error {
 	if a.closed {
 		return fmt.Errorf("adapter is closed")
 	}
@@ -63,7 +106,18 @@ func (a *SSEAdapter) sendEvent(event *model.Event) error {
 		return fmt.Errorf("marshal event failed: %w", err)
 	}
 
-	sseData := fmt.Sprintf("event: %s\ndata: %s\n\n", event.Type, string(data))
+	var sseData string
+	if a.enableResume && event.StreamID != "" {
+		sseData = fmt.Sprintf("id: %s\n", event.StreamID)
+		if !a.retrySent {
+			sseData += "retry: 3000\n"
+			a.retrySent = true
+		}
+		sseData += fmt.Sprintf("event: %s\ndata: %s\n\n", event.Type, string(data))
+	} else {
+		sseData = fmt.Sprintf("event: %s\ndata: %s\n\n", event.Type, string(data))
+	}
+
 	if _, err = fmt.Fprint(a.w, sseData); err != nil {
 		return fmt.Errorf("write sse data failed: %w", err)
 	}
@@ -74,7 +128,7 @@ func (a *SSEAdapter) sendEvent(event *model.Event) error {
 
 // SendError 发送错误事件
 func (a *SSEAdapter) SendError(err error) error {
-	return a.sendEvent(&model.Event{
+	return a.SendEvent(&model.Event{
 		Type:      model.EventTypeError,
 		Timestamp: time.Now(),
 		Data:      map[string]any{"error": err.Error()},
